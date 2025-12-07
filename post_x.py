@@ -17,7 +17,7 @@ auth = OAuth1(API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET)
 
 
 # =====================
-#  日付（曜日付き）を生成
+#  日付（曜日付き）
 # =====================
 def get_today_text():
     now = datetime.utcnow()
@@ -32,7 +32,7 @@ def get_today_text():
 # =====================
 #  Fear & Greed API（Stock）
 # =====================
-def get_stock_fgi():
+def get_stock_fgi_with_prev():
     url = "https://fear-and-greed-index.p.rapidapi.com/v1/fgi"
     headers = {
         "x-rapidapi-key": os.getenv("RAPIDAPI_KEY"),
@@ -40,32 +40,55 @@ def get_stock_fgi():
     }
 
     data = requests.get(url, headers=headers).json()["fgi"]
-    return int(data["now"]["value"])
+    now = int(data["now"]["value"])
+    prev = int(data["previousClose"]["value"])
+
+    return now, prev
 
 
 # =====================
-#  Crypto（alternative.me）
+#  Crypto（today と yesterday）
 # =====================
-def get_crypto_fgi():
-    data = requests.get("https://api.alternative.me/fng/?limit=1").json()
-    v = data["data"][0]["value"]
-    return int(v)
+def get_crypto_fgi_with_prev():
+    data = requests.get("https://api.alternative.me/fng/?limit=2").json()["data"]
+
+    now = int(data[0]["value"])
+    prev = int(data[1]["value"])
+
+    return now, prev
 
 
 # =====================
-#  投稿文を生成
+#  矢印を返す
+# =====================
+def arrow(now, prev):
+    if now > prev:
+        return "↗︎"
+    elif now < prev:
+        return "↘︎"
+    else:
+        return "↔︎"
+
+
+# =====================
+#  投稿文生成
 # =====================
 def build_post_text():
     today = get_today_text()
-    stock_now = get_stock_fgi()
-    bitcoin_now = get_crypto_fgi()
+
+    stock_now, stock_prev = get_stock_fgi_with_prev()
+    crypto_now, crypto_prev = get_crypto_fgi_with_prev()
+
+    stock_arrow = arrow(stock_now, stock_prev)
+    crypto_arrow = arrow(crypto_now, crypto_prev)
 
     text = (
         "CNN・Crypto Fear & Greed Index（恐怖と欲望指数）\n"
         f"{today}\n\n"
-        f"⬜Stock：{stock_now}\n"
-        f"🟨Bitcoin：{bitcoin_now}"
+        f"⬜Stock：{stock_now}{stock_arrow}\n"
+        f"🟨Bitcoin：{crypto_now}{crypto_arrow}"
     )
+
     return text
 
 
@@ -88,7 +111,7 @@ def upload_media(image_path):
 
 
 # =====================
-#  ツイート投稿
+#  投稿
 # =====================
 def post_tweet(text, media_id):
     url = "https://api.twitter.com/2/tweets"
@@ -105,7 +128,7 @@ def post_tweet(text, media_id):
 
 
 # =====================
-#  メイン処理
+#  メイン
 # =====================
 def main():
     print("[INFO] post_x.py started")
@@ -113,14 +136,10 @@ def main():
     if not IMAGE_PATH:
         raise Exception("IMAGE_PATH が設定されていません")
 
-    # 投稿文を自動生成
     post_text = build_post_text()
-    print(f"[INFO] POST_TEXT = \n{post_text}")
+    print("\n=== POST TEXT ===\n" + post_text + "\n")
 
-    # 画像 upload
     media_id = upload_media(IMAGE_PATH)
-
-    # 投稿
     post_tweet(post_text, media_id)
 
     print("[OK] Tweet posted successfully!")
