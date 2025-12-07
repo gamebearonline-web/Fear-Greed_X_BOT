@@ -2,8 +2,8 @@ name: FearGreedBot - Post to X
 
 on:
   workflow_dispatch:   # 手動実行
-  schedule:
-    - cron: "0 0 * * *"   # JST 9:00 に相当（UTC 0:00）
+  # ※自動投稿は generate_image_save.yml の完了後に起動されるため
+  # schedule は使わない（使うなら generate 側に移動）
 
 permissions:
   contents: read
@@ -14,6 +14,9 @@ concurrency:
 
 jobs:
   post-x:
+    # 🔥 generate_image_save.yml の jobID に合わせる（これが一番重要）
+    needs: generate-and-save
+
     runs-on: ubuntu-latest
 
     steps:
@@ -37,23 +40,16 @@ jobs:
         run: pip install -r requirements.txt
 
       # ======================
-      # 4) Google サービスアカウント復元
+      # 4) 投稿に必要な画像を取得
+      #    generate_image_save.yml が push したものを使う
       # ======================
-      - name: Restore Google service account key
+      - name: Load generated image from repo
         run: |
-          echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
-          chmod 600 service-account.json
+          ls -la output/
+          test -f output/FearGreed_Output.png
 
       # ======================
-      # 5) Fear & Greed 画像生成
-      # ======================
-      - name: Generate Fear & Greed Image
-        run: python generate.py
-        env:
-          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
-
-      # ======================
-      # 6) そのまま post_x.py を実行（画像を渡す）
+      # 5) X に投稿
       # ======================
       - name: Post to X
         env:
