@@ -105,7 +105,7 @@ def build_post_text():
         "CNN・Crypto Fear & Greed Index（恐怖と欲望指数）\n"
         f"{today}\n\n"
         f"⬜Stock：{stock_now}{stock_diff}【{stock_label}】\n"
-        f"🟨Bitcoin：{crypto_now}{crypto_diff}【{crypto_label}】"
+        f"🟧Bitcoin：{crypto_now}{crypto_diff}【{crypto_label}】"
     )
 
     return text
