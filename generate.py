@@ -155,7 +155,6 @@ def draw_text_center(draw, xywh, text, font, color):
     draw.text((x + (w - tw)/2, y + (h - th)/2), text, font=font, fill=color)
 
 
-# ラベル（値の下）
 def draw_label(draw, xywh, value, font):
     label = value_to_label(value)
     x, y, w, h = xywh
@@ -198,12 +197,13 @@ def draw_line(draw, xywh, values, color, dot):
         pts.append((px, py))
 
     draw.line(pts, fill=color, width=3)
+
     for px, py in pts:
         draw.ellipse((px-3, py-3, px+3, py+3), fill=dot)
 
 
 # ============================================================
-# 🚀 メイン処理
+# 🚀 メイン処理（座標順序修正版）
 # ============================================================
 def generate_image():
 
@@ -215,39 +215,41 @@ def generate_image():
 
     crypto_one_year = get_crypto_one_year_ago()
 
-    # ---- テンプレ画像 ----
     img = Image.open("template/FearGreedTemplate.png").convert("RGBA")
     draw = ImageDraw.Draw(img)
 
-    font = ImageFont.truetype("noto-sans-jp/NotoSansJP-Bold.otf", 40)
-    font_big = ImageFont.truetype("noto-sans-jp/NotoSansJP-Bold.otf", 70)
+    font       = ImageFont.truetype("noto-sans-jp/NotoSansJP-Bold.otf", 40)
+    font_big   = ImageFont.truetype("noto-sans-jp/NotoSansJP-Bold.otf", 70)
     font_small = ImageFont.truetype("noto-sans-jp/NotoSansJP-Regular.otf", 16)
 
+    # ============================================================
+    # ★ 正しい表示順に並べ替えた coords（重要）
+    # ============================================================
     coords = {
         "stock": {
-            "1_year_ago": [220,350,40,40],
-            "1_month_ago":[220,423,40,40],
-            "1_week_ago":[220,496,40,40],
-            "1_day_ago":[220,570,40,40],
-            "previous":[211,160,218,218],
+            "1_day_ago":   [220,350,40,40],
+            "1_week_ago":  [220,423,40,40],
+            "1_month_ago": [220,496,40,40],
+            "1_year_ago":  [220,570,40,40],
+            "previous":    [211,160,218,218],
         },
-        "crypto":{
-            "1_year_ago":[1060,350,40,40],
-            "1_month_ago":[1060,423,40,40],
-            "1_week_ago":[1060,496,40,40],
-            "1_day_ago":[1060,570,40,40],
-            "previous":[771,160,218,218],
+        "crypto": {
+            "1_day_ago":   [1060,350,40,40],
+            "1_week_ago":  [1060,423,40,40],
+            "1_month_ago": [1060,496,40,40],
+            "1_year_ago":  [1060,570,40,40],
+            "previous":    [771,160,218,218],
         },
         "graph":[360,380,480,220]
     }
 
     # ---- 値描画 ----
-    for k in ["1_year_ago","1_month_ago","1_week_ago","1_day_ago"]:
+    for k in ["1_day_ago","1_week_ago","1_month_ago","1_year_ago"]:
         v = stock[k]
         draw_text_center(draw, coords["stock"][k], str(v), font, value_to_color(v))
         draw_label(draw, coords["stock"][k], v, font_small)
 
-    for k in ["1_year_ago","1_month_ago","1_week_ago","1_day_ago"]:
+    for k in ["1_day_ago","1_week_ago","1_month_ago","1_year_ago"]:
         v = crypto_one_year if k=="1_year_ago" else crypto[k]
         draw_text_center(draw, coords["crypto"][k], str(v), font, value_to_color(v))
         draw_label(draw, coords["crypto"][k], v, font_small)
