@@ -42,7 +42,6 @@ def get_stock_fgi_with_prev():
     data = requests.get(url, headers=headers).json()["fgi"]
     now = int(data["now"]["value"])
     prev = int(data["previousClose"]["value"])
-
     return now, prev
 
 
@@ -59,15 +58,16 @@ def get_crypto_fgi_with_prev():
 
 
 # =====================
-#  矢印を返す
+#  差分フォーマット（+2 / -5 / ±0）
 # =====================
-def arrow(now, prev):
-    if now > prev:
-        return "↗︎"
-    elif now < prev:
-        return "↘︎"
+def diff(now, prev):
+    d = now - prev
+    if d > 0:
+        return f"(+{d})"
+    elif d < 0:
+        return f"({d})"  # 例: (-5)
     else:
-        return "↔︎"
+        return "(±0)"
 
 
 # =====================
@@ -79,16 +79,15 @@ def build_post_text():
     stock_now, stock_prev = get_stock_fgi_with_prev()
     crypto_now, crypto_prev = get_crypto_fgi_with_prev()
 
-    stock_arrow = arrow(stock_now, stock_prev)
-    crypto_arrow = arrow(crypto_now, crypto_prev)
+    stock_diff = diff(stock_now, stock_prev)
+    crypto_diff = diff(crypto_now, crypto_prev)
 
     text = (
         "CNN・Crypto Fear & Greed Index（恐怖と欲望指数）\n"
         f"{today}\n\n"
-        f"⬜Stock：{stock_now}{stock_arrow}\n"
-        f"🟨Bitcoin：{crypto_now}{crypto_arrow}"
+        f"⬜Stock：{stock_now}{stock_diff}\n"
+        f"🟨Bitcoin：{crypto_now}{crypto_diff}"
     )
-
     return text
 
 
