@@ -2,8 +2,7 @@ name: FearGreedBot - Post to X
 
 on:
   workflow_dispatch:   # 手動実行
-  # ※自動投稿は generate_image_save.yml の完了後に起動されるため
-  # schedule は使わない（使うなら generate 側に移動）
+  # 自動スケジュールは GAS が管理するため不要
 
 permissions:
   contents: read
@@ -14,9 +13,6 @@ concurrency:
 
 jobs:
   post-x:
-    # 🔥 generate_image_save.yml の jobID に合わせる（これが一番重要）
-    needs: generate-and-save
-
     runs-on: ubuntu-latest
 
     steps:
@@ -26,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # ======================
-      # 2) Python セットアップ（高速化）
+      # 2) Python セットアップ
       # ======================
       - uses: actions/setup-python@v5
         with:
@@ -40,11 +36,11 @@ jobs:
         run: pip install -r requirements.txt
 
       # ======================
-      # 4) 投稿に必要な画像を取得
-      #    generate_image_save.yml が push したものを使う
+      # 4) 画像確認（generate_image_save.yml が push した画像）
       # ======================
       - name: Load generated image from repo
         run: |
+          echo "List output/"
           ls -la output/
           test -f output/FearGreed_Output.png
 
