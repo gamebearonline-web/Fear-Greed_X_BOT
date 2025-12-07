@@ -1,0 +1,78 @@
+name: FearGreedBot - Post to X
+
+on:
+  workflow_dispatch:   # 手動実行
+  schedule:
+    - cron: "0 0 * * *"   # JST 9:00 に相当（UTC 0:00）
+
+permissions:
+  contents: read
+
+jobs:
+  post-x:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ======================
+      # 1) リポジトリ取得
+      # ======================
+      - uses: actions/checkout@v4
+
+      # ======================
+      # 2) Python セットアップ
+      # ======================
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ======================
+      # 3) Python 依存パッケージ
+      # ======================
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      # ======================
+      # 4) Google サービスアカウント復元
+      # ======================
+      - name: Restore Google service account key
+        run: echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
+
+      # ======================
+      # 5) Fear & Greed 画像生成
+      # ======================
+      - name: Generate Fear & Greed Image
+        run: |
+          python generate.py
+        env:
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+
+      # ======================
+      # 6) 生成画像を artifact としてアップロード（任意）
+      # ======================
+      - name: Upload generated image
+        uses: actions/upload-artifact@v4
+        with:
+          name: feargreed-image
+          path: output/FearGreed_Output.png
+
+      # ======================
+      # 7) artifact を投稿用に取得
+      # ======================
+      - name: Download artifact for posting
+        uses: actions/download-artifact@v4
+        with:
+          name: feargreed-image
+          path: post-image
+
+      # ======================
+      # 8) X に投稿
+      # ======================
+      - name: Post to X
+        env:
+          TWITTER_API_KEY:        ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET:     ${{ secrets.TWITTER_API_SECRET }}
+          TWITTER_ACCESS_TOKEN:   ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_SECRET:  ${{ secrets.TWITTER_ACCESS_SECRET }}
+          IMAGE_PATH: post-image/FearGreed_Output.png
+          POST_TEXT: "Fear & Greed Index 更新📊"   # 必要なら GAS と同じ形式に変更可能
+        run: python post_x.py
