@@ -159,7 +159,7 @@ def draw_label(draw, xywh, value, font):
     label = value_to_label(value)
     x, y, w, h = xywh
     tw, th = draw.textbbox((0, 0), label, font=font)[2:]
-    draw.text((x + (w - tw)/2, y + h + 1), label, font=font, fill=value_to_color(value))
+    draw.text((x + (w - tw)/2, y + h ), label, font=font, fill=value_to_color(value))
 
 
 # ============================================================
