@@ -30,7 +30,23 @@ def get_today_text():
 
 
 # =====================
-#  Fear & Greed API（Stock）
+#  ラベル判定
+# =====================
+def value_to_label(v):
+    if v <= 24:
+        return "Extreme Fear"
+    elif v <= 44:
+        return "Fear"
+    elif v <= 55:
+        return "Neutral"
+    elif v <= 75:
+        return "Greed"
+    else:
+        return "Extreme Greed"
+
+
+# =====================
+#  Stock FGI
 # =====================
 def get_stock_fgi_with_prev():
     url = "https://fear-and-greed-index.p.rapidapi.com/v1/fgi"
@@ -42,11 +58,12 @@ def get_stock_fgi_with_prev():
     data = requests.get(url, headers=headers).json()["fgi"]
     now = int(data["now"]["value"])
     prev = int(data["previousClose"]["value"])
-    return now, prev
+
+    return now, prev, value_to_label(now)
 
 
 # =====================
-#  Crypto（today と yesterday）
+#  Crypto FGI
 # =====================
 def get_crypto_fgi_with_prev():
     data = requests.get("https://api.alternative.me/fng/?limit=2").json()["data"]
@@ -54,18 +71,18 @@ def get_crypto_fgi_with_prev():
     now = int(data[0]["value"])
     prev = int(data[1]["value"])
 
-    return now, prev
+    return now, prev, value_to_label(now)
 
 
 # =====================
-#  差分フォーマット（+2 / -5 / ±0）
+#  差分
 # =====================
 def diff(now, prev):
     d = now - prev
     if d > 0:
         return f"(+{d})"
     elif d < 0:
-        return f"({d})"  # 例: (-5)
+        return f"({d})"
     else:
         return "(±0)"
 
@@ -76,8 +93,8 @@ def diff(now, prev):
 def build_post_text():
     today = get_today_text()
 
-    stock_now, stock_prev = get_stock_fgi_with_prev()
-    crypto_now, crypto_prev = get_crypto_fgi_with_prev()
+    stock_now, stock_prev, stock_label = get_stock_fgi_with_prev()
+    crypto_now, crypto_prev, crypto_label = get_crypto_fgi_with_prev()
 
     stock_diff = diff(stock_now, stock_prev)
     crypto_diff = diff(crypto_now, crypto_prev)
@@ -85,14 +102,14 @@ def build_post_text():
     text = (
         "CNN・Crypto Fear & Greed Index（恐怖と欲望指数）\n"
         f"{today}\n\n"
-        f"⬜Stock：{stock_now}{stock_diff}\n"
-        f"🟨Bitcoin：{crypto_now}{crypto_diff}"
+        f"⬜Stock：{stock_now}{stock_diff}【{stock_label}】\n"
+        f"🟨Bitcoin：{crypto_now}{crypto_diff}【{crypto_label}】"
     )
     return text
 
 
 # =====================
-#  画像アップロード
+#  メディアアップロード
 # =====================
 def upload_media(image_path):
     url = "https://upload.twitter.com/1.1/media/upload.json"
@@ -110,7 +127,7 @@ def upload_media(image_path):
 
 
 # =====================
-#  投稿
+#  ツイート投稿
 # =====================
 def post_tweet(text, media_id):
     url = "https://api.twitter.com/2/tweets"
