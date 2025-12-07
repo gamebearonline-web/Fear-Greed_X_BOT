@@ -1,0 +1,64 @@
+name: generate_image_save
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write    # ← リポジトリへ push するため必要
+
+jobs:
+  generate-and-save:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ======================
+      # 1) リポジトリ取得
+      # ======================
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      # ======================
+      # 2) Python セットアップ
+      # ======================
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ======================
+      # 3) Python依存インストール
+      # ======================
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      # ======================
+      # 4) Google サービスアカウント復元
+      # ======================
+      - name: Restore Google service account key
+        run: echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
+
+      # ======================
+      # 5) Fear & Greed 画像生成
+      # ======================
+      - name: Run image generator (SAVE)
+        run: |
+          python generate.py
+        env:
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+
+      # ======================
+      # 6) 生成画像を commit & push（強制コミット）
+      # ======================
+      - name: Commit and Push (always commit)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # output フォルダ内の画像をステージ
+          git add output/FearGreed_Output.png
+
+          # 差分がなくても毎回コミットを作成
+          git commit --allow-empty -m "Update FearGreed_Output.png (force)"
+
+          git push origin HEAD:main
