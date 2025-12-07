@@ -266,7 +266,7 @@ def generate_image():
     draw = ImageDraw.Draw(img)
 
     # ---- フォント ----
-    font_path = "fonts/NotoSansJP-Bold.otf"
+    font_path = "noto-sans-jp/NotoSansJP-Bold.otf"
 
     font       = ImageFont.truetype(font_path, 40)
     font_big   = ImageFont.truetype(font_path, 70)
