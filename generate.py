@@ -96,7 +96,7 @@ def get_crypto_fgi():
         "now": int(data[0]["value"]),
         "1_day_ago": int(data[1]["value"]),
         "1_week_ago": int(data[7]["value"]),
-        "1_month_ago": int(data[-1]["value"]),
+        "1_month_ago": int(data[-1]["value"]),   # 最新30件の最後が「約1ヶ月前」
         "raw": data,
     }
 
@@ -108,7 +108,7 @@ def append_last_7days_crypto(raw):
     ws = get_sheet("CryptoGreedFear")
     existing = {r[0] for r in ws.get_all_values()[1:]}
 
-    for d in reversed(raw[:7]):
+    for d in reversed(raw[:7]):   # 古い → 新しい の順で追加
         dt = datetime.fromtimestamp(int(d["timestamp"]))
         date = f"{dt.year}/{dt.month}/{dt.day}"
         if date not in existing:
@@ -203,7 +203,7 @@ def draw_line(draw, xywh, values, color, dot):
 
 
 # ============================================================
-# 🚀 メイン処理（座標順序修正版）
+# 🚀 メイン処理（crypto の順序修正版）
 # ============================================================
 def generate_image():
 
@@ -222,9 +222,9 @@ def generate_image():
     font_big   = ImageFont.truetype("noto-sans-jp/NotoSansJP-Bold.otf", 70)
     font_small = ImageFont.truetype("noto-sans-jp/NotoSansJP-Regular.otf", 16)
 
-    # ============================================================
-    # ★ 正しい表示順に並べ替えた coords（重要）
-    # ============================================================
+    # ------------------------------------------------------------
+    # 正しい表示順の座標
+    # ------------------------------------------------------------
     coords = {
         "stock": {
             "1_day_ago":   [220,350,40,40],
@@ -243,26 +243,41 @@ def generate_image():
         "graph":[360,380,480,220]
     }
 
-    # ---- 値描画 ----
-    for k in ["1_day_ago","1_week_ago","1_month_ago","1_year_ago"]:
+    # ------------------------------------------------------------
+    # STOCK 描画
+    # ------------------------------------------------------------
+    stock_order = ["1_day_ago","1_week_ago","1_month_ago","1_year_ago"]
+
+    for k in stock_order:
         v = stock[k]
         draw_text_center(draw, coords["stock"][k], str(v), font, value_to_color(v))
         draw_label(draw, coords["stock"][k], v, font_small)
 
-    for k in ["1_day_ago","1_week_ago","1_month_ago","1_year_ago"]:
+    # ------------------------------------------------------------
+    # CRYPTO 描画（順序固定）
+    # ------------------------------------------------------------
+    crypto_order = ["1_day_ago","1_week_ago","1_month_ago","1_year_ago"]
+
+    for k in crypto_order:
         v = crypto_one_year if k=="1_year_ago" else crypto[k]
         draw_text_center(draw, coords["crypto"][k], str(v), font, value_to_color(v))
         draw_label(draw, coords["crypto"][k], v, font_small)
 
-    # ---- 針 ----
+    # ------------------------------------------------------------
+    # 針（ゲージ）
+    # ------------------------------------------------------------
     draw_needle(draw, (320, 324), stock["now"])
     draw_needle(draw, (880, 324), crypto["now"])
 
-    # ---- 現在値（大） ----
+    # ------------------------------------------------------------
+    # 現在値（中央の大きい数字）
+    # ------------------------------------------------------------
     draw_text_center(draw, coords["stock"]["previous"], str(stock["now"]), font_big, value_to_color(stock["now"]))
     draw_text_center(draw, coords["crypto"]["previous"], str(crypto["now"]), font_big, value_to_color(crypto["now"]))
 
-    # ---- グラフ ----
+    # ------------------------------------------------------------
+    # 折れ線グラフ
+    # ------------------------------------------------------------
     gx, gy, gw, gh = coords["graph"]
     stock_vals  = get_last30_with_now("StockFear&Greed", stock["now"])
     crypto_vals = get_last30_with_now("CryptoGreedFear", crypto["now"])
@@ -270,7 +285,9 @@ def generate_image():
     draw_line(draw, (gx,gy,gw,gh), stock_vals,  "#f2f2f2", "#ffffff")
     draw_line(draw, (gx,gy,gw,gh), crypto_vals, "#f7921a", "#f7921a")
 
-    # ---- 保存 ----
+    # ------------------------------------------------------------
+    # 保存
+    # ------------------------------------------------------------
     os.makedirs("output", exist_ok=True)
     save_path = "output/FearGreed_Output.png"
     img.save(save_path)
