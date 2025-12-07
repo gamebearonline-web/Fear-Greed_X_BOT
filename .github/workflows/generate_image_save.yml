@@ -4,7 +4,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write    # ← リポジトリへ push するため必要
+  contents: write    # push に必要
+
+concurrency:
+  group: save-image
+  cancel-in-progress: true
 
 jobs:
   generate-and-save:
@@ -16,15 +20,15 @@ jobs:
       # ======================
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          persist-credentials: true
+          fetch-depth: 0   # push するなら必要
 
       # ======================
-      # 2) Python セットアップ
+      # 2) Python セットアップ（キャッシュ付き）
       # ======================
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"   # ← インストール高速化
 
       # ======================
       # 3) Python依存インストール
@@ -36,29 +40,26 @@ jobs:
       # 4) Google サービスアカウント復元
       # ======================
       - name: Restore Google service account key
-        run: echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
+        run: |
+          echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
+          chmod 600 service-account.json   # ← 重要
 
       # ======================
       # 5) Fear & Greed 画像生成
       # ======================
       - name: Run image generator (SAVE)
-        run: |
-          python generate.py
+        run: python generate.py
         env:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
 
       # ======================
-      # 6) 生成画像を commit & push（強制コミット）
+      # 6) 画像を commit & push（強制コミット）
       # ======================
       - name: Commit and Push (always commit)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # output フォルダ内の画像をステージ
           git add output/FearGreed_Output.png
-
-          # 差分がなくても毎回コミットを作成
           git commit --allow-empty -m "Update FearGreed_Output.png (force)"
-
           git push origin HEAD:main
