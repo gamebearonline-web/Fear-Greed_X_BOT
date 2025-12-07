@@ -17,6 +17,8 @@ jobs:
       # ======================
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # ← 推奨（後々の拡張に備える）
 
       # ======================
       # 2) Python セットアップ
@@ -25,6 +27,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"   # ← インストール高速化
 
       # ======================
       # 3) ライブラリインストール
@@ -36,14 +39,15 @@ jobs:
       # 4) Google 認証ファイル復元
       # ======================
       - name: Restore Google service account key
-        run: echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
+        run: |
+          echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
+          chmod 600 service-account.json   # ← 安全性アップ
 
       # ======================
       # 5) Fear & Greed 画像生成
       # ======================
       - name: Run image generator
-        run: |
-          python generate.py
+        run: python generate.py
         env:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
 
