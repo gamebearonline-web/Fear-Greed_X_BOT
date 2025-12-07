@@ -1,37 +1,33 @@
 import os
 import requests
 from requests_oauthlib import OAuth1
-from datetime import datetime
+from datetime import datetime, timedelta
 
-# =====================
+# ==========================
 #  OAuth1 認証
-# =====================
+# ==========================
 API_KEY = os.getenv("TWITTER_API_KEY")
 API_SECRET = os.getenv("TWITTER_API_SECRET")
 ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
 ACCESS_SECRET = os.getenv("TWITTER_ACCESS_SECRET")
-
 IMAGE_PATH = os.getenv("IMAGE_PATH")
+RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
 
 auth = OAuth1(API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET)
 
 
-# =====================
-#  日付（曜日付き）
-# =====================
+# ==========================
+# JST 今日の日付
+# ==========================
 def get_today_text():
-    now = datetime.utcnow()
-    jst = now.replace(hour=now.hour + 9)
-
+    now = datetime.utcnow() + timedelta(hours=9)
     weekday_map = ["月", "火", "水", "木", "金", "土", "日"]
-    w = weekday_map[jst.weekday()]
-
-    return f"{jst.strftime('%Y/%m/%d')}（{w}）"
+    return f"{now.strftime('%Y/%m/%d')}（{weekday_map[now.weekday()]}）"
 
 
-# =====================
-#  ラベル判定
-# =====================
+# ==========================
+# ラベル判定
+# ==========================
 def value_to_label(v):
     if v <= 24:
         return "Extreme Fear"
@@ -45,38 +41,44 @@ def value_to_label(v):
         return "Extreme Greed"
 
 
-# =====================
-#  Stock FGI
-# =====================
+# ==========================
+# Stock FGI（前回との差含む）
+# ==========================
 def get_stock_fgi_with_prev():
+    if not RAPIDAPI_KEY:
+        raise Exception("RAPIDAPI_KEY が設定されていません（Stock FGI 用）")
+
     url = "https://fear-and-greed-index.p.rapidapi.com/v1/fgi"
     headers = {
-        "x-rapidapi-key": os.getenv("RAPIDAPI_KEY"),
+        "x-rapidapi-key": RAPIDAPI_KEY,
         "x-rapidapi-host": "fear-and-greed-index.p.rapidapi.com",
     }
 
     data = requests.get(url, headers=headers).json()["fgi"]
+
     now = int(data["now"]["value"])
     prev = int(data["previousClose"]["value"])
+    label = value_to_label(now)
 
-    return now, prev, value_to_label(now)
+    return now, prev, label
 
 
-# =====================
-#  Crypto FGI
-# =====================
+# ==========================
+# Crypto FGI（前回との差含む）
+# ==========================
 def get_crypto_fgi_with_prev():
     data = requests.get("https://api.alternative.me/fng/?limit=2").json()["data"]
 
     now = int(data[0]["value"])
     prev = int(data[1]["value"])
+    label = value_to_label(now)
 
-    return now, prev, value_to_label(now)
+    return now, prev, label
 
 
-# =====================
-#  差分
-# =====================
+# ==========================
+# 差分
+# ==========================
 def diff(now, prev):
     d = now - prev
     if d > 0:
@@ -87,9 +89,9 @@ def diff(now, prev):
         return "(±0)"
 
 
-# =====================
-#  投稿文生成
-# =====================
+# ==========================
+# 投稿文生成
+# ==========================
 def build_post_text():
     today = get_today_text()
 
@@ -105,12 +107,13 @@ def build_post_text():
         f"⬜Stock：{stock_now}{stock_diff}【{stock_label}】\n"
         f"🟨Bitcoin：{crypto_now}{crypto_diff}【{crypto_label}】"
     )
+
     return text
 
 
-# =====================
-#  メディアアップロード
-# =====================
+# ==========================
+# メディアアップロード
+# ==========================
 def upload_media(image_path):
     url = "https://upload.twitter.com/1.1/media/upload.json"
 
@@ -126,15 +129,19 @@ def upload_media(image_path):
     return media_id
 
 
-# =====================
-#  ツイート投稿
-# =====================
+# ==========================
+# ツイート投稿
+# ==========================
 def post_tweet(text, media_id):
     url = "https://api.twitter.com/2/tweets"
     payload = {"text": text, "media": {"media_ids": [media_id]}}
 
-    headers = {"Content-Type": "application/json"}
-    response = requests.post(url, auth=auth, json=payload, headers=headers)
+    response = requests.post(
+        url,
+        auth=auth,
+        json=payload,
+        headers={"Content-Type": "application/json"},
+    )
 
     print("Tweet status:", response.status_code)
     print(response.text)
@@ -143,14 +150,14 @@ def post_tweet(text, media_id):
         raise Exception(f"Tweet Failed: {response.text}")
 
 
-# =====================
-#  メイン
-# =====================
+# ==========================
+# メイン処理
+# ==========================
 def main():
     print("[INFO] post_x.py started")
 
     if not IMAGE_PATH:
-        raise Exception("IMAGE_PATH が設定されていません")
+        raise Exception("IMAGE_PATH が設定されていません（投稿画像パス）")
 
     post_text = build_post_text()
     print("\n=== POST TEXT ===\n" + post_text + "\n")
