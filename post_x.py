@@ -20,7 +20,6 @@ auth = OAuth1(API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET)
 #  日付（曜日付き）を生成
 # =====================
 def get_today_text():
-    # 日本時間
     now = datetime.utcnow()
     jst = now.replace(hour=now.hour + 9)
 
@@ -31,11 +30,43 @@ def get_today_text():
 
 
 # =====================
+#  Fear & Greed API（Stock）
+# =====================
+def get_stock_fgi():
+    url = "https://fear-and-greed-index.p.rapidapi.com/v1/fgi"
+    headers = {
+        "x-rapidapi-key": os.getenv("RAPIDAPI_KEY"),
+        "x-rapidapi-host": "fear-and-greed-index.p.rapidapi.com",
+    }
+
+    data = requests.get(url, headers=headers).json()["fgi"]
+    return int(data["now"]["value"])
+
+
+# =====================
+#  Crypto（alternative.me）
+# =====================
+def get_crypto_fgi():
+    data = requests.get("https://api.alternative.me/fng/?limit=1").json()
+    v = data["data"][0]["value"]
+    return int(v)
+
+
+# =====================
 #  投稿文を生成
 # =====================
 def build_post_text():
-    today_text = get_today_text()
-    return f"CNN・Crypto Fear & Greed Index（恐怖と欲望指数）\n{today_text}"
+    today = get_today_text()
+    stock_now = get_stock_fgi()
+    bitcoin_now = get_crypto_fgi()
+
+    text = (
+        "CNN・Crypto Fear & Greed Index（恐怖と欲望指数）\n"
+        f"{today}\n\n"
+        f"⬜Stock：{stock_now}\n"
+        f"🟨Bitcoin：{bitcoin_now}"
+    )
+    return text
 
 
 # =====================
@@ -84,7 +115,7 @@ def main():
 
     # 投稿文を自動生成
     post_text = build_post_text()
-    print(f"[INFO] POST_TEXT = {post_text}")
+    print(f"[INFO] POST_TEXT = \n{post_text}")
 
     # 画像 upload
     media_id = upload_media(IMAGE_PATH)
