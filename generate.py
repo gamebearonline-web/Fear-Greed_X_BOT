@@ -268,9 +268,10 @@ def generate_image():
     # ---- フォント ----
     font_path = "noto-sans-jp/NotoSansJP-Bold.otf"
 
-    font       = ImageFont.truetype(font_path, 40)
-    font_big   = ImageFont.truetype(font_path, 70)
-    font_small = ImageFont.truetype(font_path, 16)
+font       = ImageFont.truetype("noto-sans-jp/NotoSansJP-Bold.otf", 40)
+font_big   = ImageFont.truetype("noto-sans-jp/NotoSansJP-Bold.otf", 70)
+font_small = ImageFont.truetype("noto-sans-jp/NotoSansJP-Regular.otf", 16)
+
 
     # ---- 座標 ----
     coords = {
