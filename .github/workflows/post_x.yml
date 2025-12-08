@@ -21,7 +21,9 @@ jobs:
           python-version: "3.11"
 
       - name: Install deps
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          pip install tweepy
 
       - name: Check files
         run: |
@@ -36,8 +38,5 @@ jobs:
           TWITTER_ACCESS_SECRET:  ${{ secrets.TWITTER_ACCESS_SECRET }}
           IMAGE_PATH: output/FearGreed_Output.png
           POST_TEXT_PATH: post_text.txt
-
-          # ★★★ これが必要 ★★★
-          RAPIDAPI_KEY:           ${{ secrets.RAPIDAPI_KEY }}
-
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
         run: python post_x.py
