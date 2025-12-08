@@ -25,6 +25,7 @@ jobs:
           name: feargreed-image
           path: output
           run-id: ${{ github.event.workflow_run.id }}
+          repository: ${{ github.repository }}    # ★ 必須
 
       - name: Check image
         run: |
@@ -40,6 +41,7 @@ jobs:
           name: post_text
           path: artifacts
           run-id: ${{ github.event.workflow_run.id }}
+          repository: ${{ github.repository }}    # ★ 必須
 
       - name: View text
         run: |
