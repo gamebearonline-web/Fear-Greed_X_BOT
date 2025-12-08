@@ -1,12 +1,9 @@
 name: FearGreedBot - Post to X
 
 on:
-  workflow_dispatch:
   workflow_run:
-    workflows: ["generate_image"]
-    types:
-      - completed
-
+    workflows: ["generate_image"]   # ← 画像生成完了後に自動起動
+    types: [completed]
 
 permissions:
   contents: read
@@ -27,12 +24,15 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt
 
-      # 画像生成 artifact を取得
+      # ======================
+      # 画像 artifact の取得（画像生成の run-id を確実に参照）
+      # ======================
       - name: Download latest artifact
         uses: actions/download-artifact@v4
         with:
           name: feargreed-image
           path: output
+          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Check downloaded image
         run: |
@@ -40,7 +40,9 @@ jobs:
           ls -la output/
           test -f output/FearGreed_Output.png
 
-      # X 投稿
+      # ======================
+      # X に投稿
+      # ======================
       - name: Post to X
         env:
           TWITTER_API_KEY:        ${{ secrets.TWITTER_API_KEY }}
@@ -51,14 +53,10 @@ jobs:
           IMAGE_PATH: output/FearGreed_Output.png
         run: python post_x.py
 
-      # ★ 他SNS向け artifact をアップロード（最重要）
-      - name: Upload image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: feargreed-image
-          path: output/FearGreed_Output.png
-
-      - name: Upload post text artifact
+      # ======================
+      # 他SNS用の投稿文を artifact として保存
+      # ======================
+      - name: Upload post_text artifact
         uses: actions/upload-artifact@v4
         with:
           name: post_text
