@@ -72,7 +72,7 @@ jobs:
           # 変更があるファイルだけ追加
           git add output/FearGreed_Output.png
 
-          # 差分があるか確認（なければ commit しない）
+          # 差分があるか確認して commit（なければ commit しない）
           if ! git diff --cached --quiet; then
             git commit -m "Update FearGreed_Output.png (auto)"
             git push
@@ -80,4 +80,3 @@ jobs:
             echo "No changes to commit"
           fi
 
-          fi
