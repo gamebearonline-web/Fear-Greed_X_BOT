@@ -14,26 +14,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) リポジトリ取得
       - uses: actions/checkout@v4
 
-      # 2) Python セットアップ
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
 
-      # 3) ライブラリ
       - name: Install deps
         run: pip install -r requirements.txt
 
-      # 4) PNG 存在チェック（post_text.txt は不要）
-      - name: Check PNG
+      - name: Check files
         run: |
-          ls -la output/
           test -f output/FearGreed_Output.png
+          test -f post_text.txt
 
-      # 5) X 投稿
       - name: Post to X
         env:
           TWITTER_API_KEY:        ${{ secrets.TWITTER_API_KEY }}
@@ -41,4 +35,5 @@ jobs:
           TWITTER_ACCESS_TOKEN:   ${{ secrets.TWITTER_ACCESS_TOKEN }}
           TWITTER_ACCESS_SECRET:  ${{ secrets.TWITTER_ACCESS_SECRET }}
           IMAGE_PATH: output/FearGreed_Output.png
+          POST_TEXT_PATH: post_text.txt
         run: python post_x.py
