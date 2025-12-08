@@ -44,12 +44,14 @@ jobs:
         env:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
         run: python generate.py
-
       # 6) commit（この commit が次を自動発火）
       - name: Commit & Push updated PNG and post_text
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
+
+          # ★ ここを追加 → push エラー防止
+          git pull origin main --rebase || true
 
           git add output/FearGreed_Output.png || true
           git add post_text.txt || true
@@ -60,3 +62,4 @@ jobs:
           else
             echo "No changes to commit"
           fi
+
