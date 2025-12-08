@@ -1,21 +1,21 @@
 name: FearGreedBot - Post to X
 
 on:
-  workflow_run:
-    workflows: ["generate_image"]   # 画像生成完了後に自動起動
-    types: [completed]
+  push:
+    paths:
+      - "output/FearGreed_Output.png"   # PNG 更新時のみ発火
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   post-x:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
-      # 最新 PNG を取得
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # Python セットアップ
       - uses: actions/setup-python@v5
@@ -26,7 +26,7 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt
 
-      # PNG の存在チェック
+      # PNG 存在チェック
       - name: Check PNG exists
         run: |
           echo "Checking output/FearGreed_Output.png ..."
@@ -43,12 +43,13 @@ jobs:
           IMAGE_PATH: output/FearGreed_Output.png
         run: python post_x.py
 
-      # 投稿文 post_text.txt をリポジトリへ保存（任意）
-      - name: Commit & push post_text
+      # 生成された投稿文 post_text.txt を commit
+      - name: Commit & push post_text.txt
         run: |
           if [ -f post_text.txt ]; then
             git config user.name "github-actions"
             git config user.email "github-actions@github.com"
+
             git add post_text.txt
             git commit -m "Update post_text.txt (auto)" || echo "No changes"
             git push
