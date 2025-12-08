@@ -2,7 +2,7 @@ name: FearGreedBot - Post to Bluesky & Misskey
 
 on:
   workflow_run:
-    workflows: ["FearGreedBot - Post to X"]   # ← post_x.yml の name を指定
+    workflows: ["FearGreedBot - Post to X"]   # post_x.yml の name
     types:
       - completed
 
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   post-other-sns:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}   # X投稿が成功したときのみ実行
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -21,7 +21,21 @@ jobs:
       - uses: actions/checkout@v4
 
       # ======================
-      # 2) Python セットアップ
+      # 2) X 投稿で作られた artifact を取得
+      # ======================
+      - name: Download artifacts from X workflow
+        uses: actions/download-artifact@v4
+        with:
+          name: post_text
+          path: artifacts/
+
+      - name: View downloaded artifacts
+        run: |
+          echo "Artifacts:"
+          ls -la artifacts/
+
+      # ======================
+      # 3) Python セットアップ
       # ======================
       - uses: actions/setup-python@v5
         with:
@@ -32,7 +46,7 @@ jobs:
         run: pip install -r requirements.txt atproto requests
 
       # ======================
-      # 3) 画像チェック
+      # 4) 画像チェック
       # ======================
       - name: Check generated image
         run: |
@@ -41,21 +55,23 @@ jobs:
           test -f output/FearGreed_Output.png
 
       # ======================
-      # 4) Bluesky 投稿
+      # 5) Bluesky 投稿
       # ======================
       - name: Post to Bluesky
         env:
           BSKY_HANDLE:        ${{ secrets.BSKY_HANDLE }}
           BSKY_APP_PASSWORD:  ${{ secrets.BSKY_APP_PASSWORD }}
-          IMAGE_PATH: output/FearGreed_Output.png
+          IMAGE_PATH:         output/FearGreed_Output.png
+          POST_TEXT_PATH:     artifacts/post_text.txt
         run: python post_bluesky.py
 
       # ======================
-      # 5) Misskey 投稿
+      # 6) Misskey 投稿
       # ======================
       - name: Post to Misskey
         env:
           MISSKEY_HOST:  ${{ secrets.MISSKEY_HOST }}
           MISSKEY_TOKEN: ${{ secrets.MISSKEY_TOKEN }}
-          IMAGE_PATH: output/FearGreed_Output.png
+          IMAGE_PATH:    output/FearGreed_Output.png
+          POST_TEXT_PATH: artifacts/post_text.txt
         run: python post_misskey.py
