@@ -201,6 +201,25 @@ def draw_line(draw, xywh, values, color, dot):
     for px, py in pts:
         draw.ellipse((px-3, py-3, px+3, py+3), fill=dot)
 
+    # ------------------------------------------------------------
+    # 日付描画（右上）
+    # ------------------------------------------------------------
+    # 今日の日付（例：2025/12/08（月））
+    today = datetime.now()
+    week_jp = ["月", "火", "水", "木", "金", "土", "日"]
+    date_text = today.strftime("%Y/%m/%d") + f"（{week_jp[today.weekday()]}）"
+
+    font_date = ImageFont.truetype("noto-sans-jp/NotoSansJP-Regular.otf", 20)
+    date_color = "#FFFFFF"  # 白推奨（テンプレ背景に合わせて調整可）
+
+    # 指定座標（X1020px Y20px W140px H20px）
+    x, y, w, h = 1020, 20, 140, 20
+
+    # 中央配置
+    tw, th = draw.textbbox((0, 0), date_text, font=font_date)[2:]
+    draw.text((x + (w - tw) / 2, y + (h - th) / 2),
+              date_text, font=font_date, fill=date_color)
+
 
 # ============================================================
 # 🚀 メイン処理（crypto の順序修正版）
