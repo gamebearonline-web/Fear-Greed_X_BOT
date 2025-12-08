@@ -36,4 +36,8 @@ jobs:
           TWITTER_ACCESS_SECRET:  ${{ secrets.TWITTER_ACCESS_SECRET }}
           IMAGE_PATH: output/FearGreed_Output.png
           POST_TEXT_PATH: post_text.txt
+
+          # ★★★ これが必要 ★★★
+          RAPIDAPI_KEY:           ${{ secrets.RAPIDAPI_KEY }}
+
         run: python post_x.py
