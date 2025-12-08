@@ -1,17 +1,17 @@
 name: FearGreedBot - Post to X
 
 on:
-  workflow_dispatch:
+  workflow_run:
+    workflows: ["generate_image"]   # ← 画像生成ワークフロー名
+    types:
+      - completed
 
 permissions:
   contents: read
 
-concurrency:
-  group: post-feargreed
-  cancel-in-progress: true
-
 jobs:
   post-x:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -26,9 +26,9 @@ jobs:
         run: pip install -r requirements.txt
 
       # ======================
-      # 4) 生成画像の artifact を取得
+      # Artifact（最新）を取得
       # ======================
-      - name: Download artifact
+      - name: Download latest artifact
         uses: actions/download-artifact@v4
         with:
           name: feargreed-image
@@ -41,7 +41,7 @@ jobs:
           test -f output/FearGreed_Output.png
 
       # ======================
-      # 5) X に投稿
+      # X投稿
       # ======================
       - name: Post to X
         env:
@@ -49,6 +49,6 @@ jobs:
           TWITTER_API_SECRET:     ${{ secrets.TWITTER_API_SECRET }}
           TWITTER_ACCESS_TOKEN:   ${{ secrets.TWITTER_ACCESS_TOKEN }}
           TWITTER_ACCESS_SECRET:  ${{ secrets.TWITTER_ACCESS_SECRET }}
-          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          RAPIDAPI_KEY:           ${{ secrets.RAPIDAPI_KEY }}
           IMAGE_PATH: output/FearGreed_Output.png
         run: python post_x.py
