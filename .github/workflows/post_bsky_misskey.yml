@@ -1,8 +1,8 @@
-name: FearGreedBot - Post to X
+name: FearGreedBot - Post to Bluesky & Misskey
 
 on:
   workflow_run:
-    workflows: ["generate_image"]
+    workflows: ["FearGreedBot - Post to X"]   # ← post_x.yml の name
     types:
       - completed
 
@@ -10,29 +10,34 @@ permissions:
   contents: read
 
 jobs:
-  post-x:
+  post-other-sns:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
+      # ======================
+      # 1) 最新の post_x.yml の run 情報を取得
+      # ======================
+      - name: Get run info
+        id: get_info
+        run: |
+          echo "run_id=${{ github.event.workflow_run.id }}" >> $GITHUB_OUTPUT
+
+      # ======================
+      # 2) リポジトリ取得
+      # ======================
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install deps
-        run: pip install -r requirements.txt
-
       # ======================
-      # Artifact（画像生成結果）を取得
+      # 3) X 投稿が生成した artifact（画像）を取得
       # ======================
-      - name: Download latest artifact
+      - name: Download image artifact
         uses: actions/download-artifact@v4
         with:
           name: feargreed-image
           path: output
+          run-id: ${{ steps.get_info.outputs.run_id }}
+          repository: ${{ github.repository }}
 
       - name: Check downloaded image
         run: |
@@ -41,32 +46,51 @@ jobs:
           test -f output/FearGreed_Output.png
 
       # ======================
-      # X投稿
+      # 4) X 投稿が生成したテキスト artifact を取得
       # ======================
-      - name: Post to X
-        env:
-          TWITTER_API_KEY:        ${{ secrets.TWITTER_API_KEY }}
-          TWITTER_API_SECRET:     ${{ secrets.TWITTER_API_SECRET }}
-          TWITTER_ACCESS_TOKEN:   ${{ secrets.TWITTER_ACCESS_TOKEN }}
-          TWITTER_ACCESS_SECRET:  ${{ secrets.TWITTER_ACCESS_SECRET }}
-          RAPIDAPI_KEY:           ${{ secrets.RAPIDAPI_KEY }}
-          IMAGE_PATH: output/FearGreed_Output.png
-        run: python post_x.py
-
-      # ======================
-      # 画像 artifact（X投稿後・他SNS用）
-      # ======================
-      - name: Upload image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: feargreed-image
-          path: output/FearGreed_Output.png
-
-      # ======================
-      # 投稿文 artifact（Bluesky/Misskey 用）
-      # ======================
-      - name: Upload post text artifact
-        uses: actions/upload-artifact@v4
+      - name: Download post text artifact
+        uses: actions/download-artifact@v4
         with:
           name: post_text
-          path: post_text.txt
+          path: artifacts
+          run-id: ${{ steps.get_info.outputs.run_id }}
+          repository: ${{ github.repository }}
+
+      - name: View text
+        run: |
+          echo "Artifacts:"
+          ls -la artifacts/
+          cat artifacts/post_text.txt
+
+      # ======================
+      # 5) Python セットアップ
+      # ======================
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install deps
+        run: pip install -r requirements.txt atproto requests
+
+      # ======================
+      # 6) Bluesky 投稿
+      # ======================
+      - name: Post to Bluesky
+        env:
+          BSKY_HANDLE:        ${{ secrets.BSKY_HANDLE }}
+          BSKY_APP_PASSWORD:  ${{ secrets.BSKY_APP_PASSWORD }}
+          IMAGE_PATH:         output/FearGreed_Output.png
+          POST_TEXT_PATH:     artifacts/post_text.txt
+        run: python post_bluesky.py
+
+      # ======================
+      # 7) Misskey 投稿
+      # ======================
+      - name: Post to Misskey
+        env:
+          MISSKEY_HOST:  ${{ secrets.MISSKEY_HOST }}
+          MISSKEY_TOKEN: ${{ secrets.MISSKEY_TOKEN }}
+          IMAGE_PATH:    output/FearGreed_Output.png
+          POST_TEXT_PATH: artifacts/post_text.txt
+        run: python post_misskey.py
