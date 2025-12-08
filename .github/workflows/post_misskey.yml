@@ -2,7 +2,7 @@ name: FearGreedBot - Post to Misskey
 
 on:
   workflow_run:
-    workflows: ["generate_image"]
+    workflows: ["FearGreedBot - Post to Bluesky"]   # ← 修正ポイント
     types: [completed]
 
 permissions:
