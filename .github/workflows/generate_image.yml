@@ -7,7 +7,7 @@ on:
       - "output/FearGreed_Output.png"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   generate:
@@ -40,18 +40,13 @@ jobs:
         run: python generate.py
 
       # ======================
-      # PNG をリポジトリに commit（Post-X が自動連動）
+      # Post to X を自動発火！（commit不要）
       # ======================
-      - name: Commit & Push updated PNG
+      - name: Trigger Post to X
+        if: success()
         run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-
-          git add output/FearGreed_Output.png
-
-          if ! git diff --cached --quiet; then
-            git commit -m "Update FearGreed_Output.png (auto)"
-            git push
-          else
-            echo "No changes to commit"
-          fi
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/post_x.yml/dispatches \
+            -d '{"ref":"main"}'
