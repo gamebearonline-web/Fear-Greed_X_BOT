@@ -1,13 +1,14 @@
 name: generate_image
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # ← GAS から起動
   push:
     paths-ignore:
       - "output/FearGreed_Output.png"
+      - "post_text.txt"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate:
@@ -15,38 +16,47 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      # 1) リポジトリ取得
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # 2) Python セットアップ
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: pip
 
+      # 3) ライブラリ
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # 4) Google 認証
       - name: Restore Google service account key
         run: |
           echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
           chmod 600 service-account.json
 
+      # 5) 画像生成 & post_text.txt 生成
       - name: Run generator
         env:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
         run: python generate.py
 
-      # ======================
-      # Post to X を自動発火！（commit不要）
-      # ======================
-      - name: Trigger Post to X
-        if: success()
+      # 6) commit（この commit が次を自動発火）
+      - name: Commit & Push updated PNG and post_text
         run: |
-          curl -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/${{ github.repository }}/actions/workflows/post_x.yml/dispatches \
-            -d '{"ref":"main"}'
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git add output/FearGreed_Output.png || true
+          git add post_text.txt || true
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Update FearGreed output (auto)"
+            git push
+          else
+            echo "No changes to commit"
+          fi
