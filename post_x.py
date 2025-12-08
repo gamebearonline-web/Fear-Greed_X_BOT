@@ -1,7 +1,6 @@
 import os
 import requests
 from requests_oauthlib import OAuth1
-from post_common import build_post_text
 
 # ==========================
 #  OAuth1 認証
@@ -10,9 +9,21 @@ API_KEY = os.getenv("TWITTER_API_KEY")
 API_SECRET = os.getenv("TWITTER_API_SECRET")
 ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
 ACCESS_SECRET = os.getenv("TWITTER_ACCESS_SECRET")
-IMAGE_PATH = os.getenv("IMAGE_PATH")
+IMAGE_PATH = os.getenv("IMAGE_PATH", "output/FearGreed_Output.png")
 
 auth = OAuth1(API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET)
+
+
+# ==========================
+# 投稿文を読み込む（GAS が生成したもの）
+# ==========================
+def load_post_text():
+    path = "post_text.txt"
+    if not os.path.exists(path):
+        raise Exception("post_text.txt が存在しません（GAS が生成していません）")
+
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read().strip()
 
 
 # ==========================
@@ -59,24 +70,19 @@ def post_tweet(text, media_id):
 def main():
     print("[INFO] post_x.py started")
 
-    if not IMAGE_PATH:
-        raise Exception("IMAGE_PATH が設定されていません（投稿画像パス）")
-
-    # 共通投稿文
-    post_text = build_post_text()
+    # 投稿文（GAS生成）を読み込む
+    post_text = load_post_text()
     print("\n=== POST TEXT ===\n" + post_text + "\n")
+
+    # 投稿画像パス確認
+    if not os.path.exists(IMAGE_PATH):
+        raise Exception(f"画像が存在しません: {IMAGE_PATH}")
 
     # X 投稿
     media_id = upload_media(IMAGE_PATH)
     post_tweet(post_text, media_id)
 
     print("[OK] Tweet posted successfully!")
-
-    # 他SNS用の投稿文保存
-    with open("post_text.txt", "w", encoding="utf-8") as f:
-        f.write(post_text)
-
-    print("[OK] Saved post_text.txt for Bluesky / Misskey")
 
 
 if __name__ == "__main__":
