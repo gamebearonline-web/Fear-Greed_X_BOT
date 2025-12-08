@@ -1,13 +1,13 @@
 name: generate_image
 
 on:
-  workflow_dispatch:   # GAS からの手動実行
+  workflow_dispatch:
   push:
     paths-ignore:
-      - "output/FearGreed_Output.png"   # ← PNG 更新による再実行を防止
+      - "output/FearGreed_Output.png"
 
 permissions:
-  contents: write      # ← commit のために必要
+  contents: write
 
 jobs:
   generate:
@@ -15,57 +15,32 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      # ======================
-      # 1) リポジトリ取得
-      # ======================
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # ======================
-      # 2) Python セットアップ
-      # ======================
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: pip
 
-      # ======================
-      # 3) ライブラリインストール
-      # ======================
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # ======================
-      # 4) Google 認証ファイル配置
-      # ======================
       - name: Restore Google service account key
         run: |
           echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
           chmod 600 service-account.json
 
-      # ======================
-      # 5) 画像生成
-      # ======================
       - name: Run generator
         env:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
         run: python generate.py
 
       # ======================
-      # 6) Artifact 保存（X投稿・他SNS投稿で使用）
-      # ======================
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: feargreed-image
-          path: output/FearGreed_Output.png
-          if-no-files-found: error
-
-      # ======================
-      # 7) PNG をリポジトリに commit（オプション）
+      # PNG をリポジトリに commit（Post-X が自動連動）
       # ======================
       - name: Commit & Push updated PNG
         run: |
