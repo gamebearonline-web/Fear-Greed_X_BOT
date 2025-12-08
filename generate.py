@@ -213,7 +213,7 @@ def draw_date(draw):
     font_date = ImageFont.truetype("noto-sans-jp/NotoSansJP-Regular.otf", 20)
 
     # 右上座標（テンプレートに合わせて固定）
-    x, y, w, h = 1020, 20, 140, 20
+    x, y, w, h = 1020, 18, 140, 20
 
     tw, th = draw.textbbox((0, 0), date_text, font=font_date)[2:]
 
