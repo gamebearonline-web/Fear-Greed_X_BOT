@@ -1,7 +1,7 @@
 # post_misskey.py
-
 import os
 import requests
+from post_common import build_post_text
 
 def main():
     print("[INFO] post_misskey.py started")
@@ -10,17 +10,12 @@ def main():
     TOKEN = os.getenv("MISSKEY_TOKEN")
     IMAGE_PATH = os.getenv("IMAGE_PATH")
 
-    if not HOST or not TOKEN:
-        raise Exception("Misskey 認証情報不足（MISSKEY_HOST / MISSKEY_TOKEN）")
-
-    if not IMAGE_PATH:
-        raise Exception("IMAGE_PATH が設定されていません")
+    text = build_post_text()
 
     # Step 1: 画像アップロード
     url_upload = f"{HOST}/api/drive/files/create"
     files = {"file": open(IMAGE_PATH, "rb")}
     payload = {"i": TOKEN}
-
     res = requests.post(url_upload, data=payload, files=files).json()
     file_id = res["id"]
 
@@ -28,10 +23,9 @@ def main():
     url_note = f"{HOST}/api/notes/create"
     payload = {
         "i": TOKEN,
-        "text": "Fear & Greed Index（Misskey 自動投稿）",
+        "text": text,
         "fileIds": [file_id],
     }
-
     res2 = requests.post(url_note, json=payload)
     print("[OK] Misskey response:", res2.text)
 
