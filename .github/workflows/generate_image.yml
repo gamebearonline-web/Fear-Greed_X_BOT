@@ -1,10 +1,10 @@
 name: generate_image
 
 on:
-  workflow_dispatch:   # GAS からの実行を受ける
+  workflow_dispatch:   # GAS からの実行
 
 permissions:
-  contents: read       # リポジトリ読み取りのみで十分
+  contents: write      # ← 重要！リポジトリに commit するため write 必須
 
 jobs:
   generate:
@@ -26,17 +26,17 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-          cache: "pip"
+          python-version: '3.11'
+          cache: pip
 
       # ======================
       # 3) ライブラリインストール
       # ======================
-      - name: Install deps
+      - name: Install dependencies
         run: pip install -r requirements.txt
 
       # ======================
-      # 4) Google 認証ファイル復元
+      # 4) Google 認証ファイル配置
       # ======================
       - name: Restore Google service account key
         run: |
@@ -44,19 +44,40 @@ jobs:
           chmod 600 service-account.json
 
       # ======================
-      # 5) Fear & Greed 画像生成
+      # 5) 画像生成
       # ======================
-      - name: Run image generator
+      - name: Run generator
         env:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
         run: python generate.py
 
       # ======================
-      # 6) PNG を artifact に保存
+      # 6) 投稿用 artifact 保存（既存処理）
       # ======================
-      - name: Upload image artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: feargreed-image
           path: output/FearGreed_Output.png
           if-no-files-found: error
+
+      # ======================
+      # 7) リポジトリに PNG を保存（上書き commit）
+      # ======================
+      - name: Commit & Push updated PNG
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          # 出力画像をリポジトリの output/ に上書きコピー
+          cp output/FearGreed_Output.png ./output/FearGreed_Output.png
+
+          git add output/FearGreed_Output.png
+
+          # 変更がある場合のみ commit
+          if ! git diff --cached --quiet; then
+            git commit -m "Update FearGreed_Output.png (auto)"
+            git push
+          else
+            echo "No changes to commit"
+          fi
