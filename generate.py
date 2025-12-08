@@ -96,7 +96,7 @@ def get_crypto_fgi():
         "now": int(data[0]["value"]),
         "1_day_ago": int(data[1]["value"]),
         "1_week_ago": int(data[7]["value"]),
-        "1_month_ago": int(data[-1]["value"]),   # 最新30件の最後が「約1ヶ月前」
+        "1_month_ago": int(data[-1]["value"]),
         "raw": data,
     }
 
@@ -108,7 +108,7 @@ def append_last_7days_crypto(raw):
     ws = get_sheet("CryptoGreedFear")
     existing = {r[0] for r in ws.get_all_values()[1:]}
 
-    for d in reversed(raw[:7]):   # 古い → 新しい の順で追加
+    for d in reversed(raw[:7]):
         dt = datetime.fromtimestamp(int(d["timestamp"]))
         date = f"{dt.year}/{dt.month}/{dt.day}"
         if date not in existing:
@@ -116,7 +116,7 @@ def append_last_7days_crypto(raw):
 
 
 # ============================================================
-# グラフ用データ（30件＋現在値）
+# グラフ用データ
 # ============================================================
 def get_last30_with_now(sheet_name, now_value):
     ws = get_sheet(sheet_name)
@@ -201,28 +201,32 @@ def draw_line(draw, xywh, values, color, dot):
     for px, py in pts:
         draw.ellipse((px-3, py-3, px+3, py+3), fill=dot)
 
-    # ------------------------------------------------------------
-    # 日付描画（右上）
-    # ------------------------------------------------------------
-    # 今日の日付（例：2025/12/08（月））
+
+# ============================================================
+# 右上：日付描画（色を #4D4D4D に固定）
+# ============================================================
+def draw_date(draw):
     today = datetime.now()
     week_jp = ["月", "火", "水", "木", "金", "土", "日"]
     date_text = today.strftime("%Y/%m/%d") + f"（{week_jp[today.weekday()]}）"
 
     font_date = ImageFont.truetype("noto-sans-jp/NotoSansJP-Regular.otf", 20)
-    date_color = "#FFFFFF"  # 白推奨（テンプレ背景に合わせて調整可）
 
-    # 指定座標（X1020px Y20px W140px H20px）
+    # 右上座標（テンプレートに合わせて固定）
     x, y, w, h = 1020, 20, 140, 20
 
-    # 中央配置
     tw, th = draw.textbbox((0, 0), date_text, font=font_date)[2:]
-    draw.text((x + (w - tw) / 2, y + (h - th) / 2),
-              date_text, font=font_date, fill=date_color)
+
+    draw.text(
+        (x + (w - tw)/2, y + (h - th)/2),
+        date_text,
+        font=font_date,
+        fill="#4D4D4D"   # ← 修正：白 → #4D4D4D
+    )
 
 
 # ============================================================
-# 🚀 メイン処理（crypto の順序修正版）
+# 🚀 メイン処理
 # ============================================================
 def generate_image():
 
@@ -241,9 +245,6 @@ def generate_image():
     font_big   = ImageFont.truetype("noto-sans-jp/NotoSansJP-Bold.otf", 70)
     font_small = ImageFont.truetype("noto-sans-jp/NotoSansJP-Regular.otf", 16)
 
-    # ------------------------------------------------------------
-    # 正しい表示順の座標
-    # ------------------------------------------------------------
     coords = {
         "stock": {
             "1_day_ago":   [220,350,40,40],
@@ -262,57 +263,40 @@ def generate_image():
         "graph":[360,380,480,220]
     }
 
-    # ------------------------------------------------------------
-    # STOCK 描画
-    # ------------------------------------------------------------
-    stock_order = ["1_day_ago","1_week_ago","1_month_ago","1_year_ago"]
-
-    for k in stock_order:
+    # STOCK
+    for k in ["1_day_ago","1_week_ago","1_month_ago","1_year_ago"]:
         v = stock[k]
         draw_text_center(draw, coords["stock"][k], str(v), font, value_to_color(v))
         draw_label(draw, coords["stock"][k], v, font_small)
 
-    # ------------------------------------------------------------
-    # CRYPTO 描画（順序固定）
-    # ------------------------------------------------------------
-    crypto_order = ["1_day_ago","1_week_ago","1_month_ago","1_year_ago"]
-
-    for k in crypto_order:
+    # CRYPTO
+    for k in ["1_day_ago","1_week_ago","1_month_ago","1_year_ago"]:
         v = crypto_one_year if k=="1_year_ago" else crypto[k]
         draw_text_center(draw, coords["crypto"][k], str(v), font, value_to_color(v))
         draw_label(draw, coords["crypto"][k], v, font_small)
 
-    # ------------------------------------------------------------
-    # 針（ゲージ）
-    # ------------------------------------------------------------
+    # 針
     draw_needle(draw, (320, 324), stock["now"])
     draw_needle(draw, (880, 324), crypto["now"])
 
-    # ------------------------------------------------------------
-    # 現在値（中央の大きい数字）
-    # ------------------------------------------------------------
+    # 中央の数字
     draw_text_center(draw, coords["stock"]["previous"], str(stock["now"]), font_big, value_to_color(stock["now"]))
     draw_text_center(draw, coords["crypto"]["previous"], str(crypto["now"]), font_big, value_to_color(crypto["now"]))
 
-    # ------------------------------------------------------------
-    # 折れ線グラフ
-    # ------------------------------------------------------------
+    # グラフ
     gx, gy, gw, gh = coords["graph"]
-    stock_vals  = get_last30_with_now("StockFear&Greed", stock["now"])
-    crypto_vals = get_last30_with_now("CryptoGreedFear", crypto["now"])
+    draw_line(draw, (gx,gy,gw,gh), get_last30_with_now("StockFear&Greed", stock["now"]), "#f2f2f2", "#ffffff")
+    draw_line(draw, (gx,gy,gw,gh), get_last30_with_now("CryptoGreedFear", crypto["now"]), "#f7921a", "#f7921a")
 
-    draw_line(draw, (gx,gy,gw,gh), stock_vals,  "#f2f2f2", "#ffffff")
-    draw_line(draw, (gx,gy,gw,gh), crypto_vals, "#f7921a", "#f7921a")
+    # 🔥 日付追加（修正版）
+    draw_date(draw)
 
-    # ------------------------------------------------------------
     # 保存
-    # ------------------------------------------------------------
     os.makedirs("output", exist_ok=True)
-    save_path = "output/FearGreed_Output.png"
-    img.save(save_path)
-
-    print("[SAVED]", save_path)
-    return save_path
+    path = "output/FearGreed_Output.png"
+    img.save(path)
+    print("[SAVED]", path)
+    return path
 
 
 if __name__ == "__main__":
