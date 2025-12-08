@@ -2,7 +2,7 @@ name: FearGreedBot - Post to X
 
 on:
   workflow_run:
-    workflows: ["generate_image"]   # ← 画像生成完了後に自動起動
+    workflows: ["generate_image"]   # 画像生成完了後に自動起動
     types: [completed]
 
 permissions:
@@ -25,7 +25,7 @@ jobs:
         run: pip install -r requirements.txt
 
       # ======================
-      # 画像 artifact の取得（画像生成の run-id を確実に参照）
+      # 画像 artifact の取得
       # ======================
       - name: Download latest artifact
         uses: actions/download-artifact@v4
@@ -41,7 +41,7 @@ jobs:
           test -f output/FearGreed_Output.png
 
       # ======================
-      # X に投稿
+      # X に投稿して post_text.txt を生成
       # ======================
       - name: Post to X
         env:
@@ -54,10 +54,11 @@ jobs:
         run: python post_x.py
 
       # ======================
-      # 他SNS用の投稿文を artifact として保存
+      # 他SNS用 投稿文を artifact 化
       # ======================
       - name: Upload post_text artifact
         uses: actions/upload-artifact@v4
         with:
           name: post_text
           path: post_text.txt
+          if-no-files-found: error
