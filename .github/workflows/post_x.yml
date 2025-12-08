@@ -1,8 +1,7 @@
 name: FearGreedBot - Post to X
 
 on:
-  workflow_dispatch:   # 手動実行
-  # 自動スケジュールは GAS が管理するため不要
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,29 +15,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ======================
-      # 1) リポジトリ取得
-      # ======================
       - uses: actions/checkout@v4
 
-      # ======================
-      # 2) Python セットアップ
-      # ======================
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
 
-      # ======================
-      # 3) Python 依存パッケージ
-      # ======================
       - name: Install deps
         run: pip install -r requirements.txt
 
       # ======================
-      # 4) 画像確認（generate_image_save.yml が push した画像）
+      # 4) 生成画像の artifact を取得
       # ======================
-      - name: Load generated image from repo
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: feargreed-image
+          path: output
+
+      - name: Check downloaded image
         run: |
           echo "List output/"
           ls -la output/
