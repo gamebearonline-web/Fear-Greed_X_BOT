@@ -92,23 +92,8 @@ def diff(now, prev):
 # ==========================
 # 投稿文生成
 # ==========================
-def build_post_text():
-    today = get_today_text()
+from post_common import build_post_text
 
-    stock_now, stock_prev, stock_label = get_stock_fgi_with_prev()
-    crypto_now, crypto_prev, crypto_label = get_crypto_fgi_with_prev()
-
-    stock_diff = diff(stock_now, stock_prev)
-    crypto_diff = diff(crypto_now, crypto_prev)
-
-    text = (
-        "CNN・Crypto Fear & Greed Index（恐怖と欲望指数）\n"
-        f"{today}\n\n"
-        f"⬜Stock：{stock_now}{stock_diff}【{stock_label}】\n"
-        f"🟧Bitcoin：{crypto_now}{crypto_diff}【{crypto_label}】"
-    )
-
-    return text
 
 
 # ==========================
