@@ -1,7 +1,7 @@
 # post_bluesky.py
-
 import os
 from atproto import Client
+from post_common import build_post_text
 
 def main():
     print("[INFO] post_bluesky.py started")
@@ -10,11 +10,7 @@ def main():
     PASSWORD = os.getenv("BSKY_APP_PASSWORD")
     IMAGE_PATH = os.getenv("IMAGE_PATH")
 
-    if not HANDLE or not PASSWORD:
-        raise Exception("Bluesky 認証情報が不足しています（BSKY_HANDLE / BSKY_APP_PASSWORD）")
-
-    if not IMAGE_PATH:
-        raise Exception("IMAGE_PATH が設定されていません")
+    text = build_post_text()
 
     client = Client()
     client.login(HANDLE, PASSWORD)
@@ -23,7 +19,7 @@ def main():
         img = f.read()
 
     client.send_post(
-        text="Fear & Greed Index（Bluesky 自動投稿）",
+        text=text,
         embed=client.upload_blob(img)
     )
 
