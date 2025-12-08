@@ -1,10 +1,13 @@
 name: generate_image
 
 on:
-  workflow_dispatch:   # GAS からの実行
+  workflow_dispatch:   # GAS からの手動実行
+  push:
+    paths-ignore:
+      - "output/FearGreed_Output.png"   # ← PNG 更新による再実行を防止
 
 permissions:
-  contents: write      # ← 重要！リポジトリに commit するため write 必須
+  contents: write      # ← commit のために必要
 
 jobs:
   generate:
@@ -52,7 +55,7 @@ jobs:
         run: python generate.py
 
       # ======================
-      # 6) 投稿用 artifact 保存（既存処理）
+      # 6) Artifact 保存（X投稿・他SNS投稿で使用）
       # ======================
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -62,21 +65,18 @@ jobs:
           if-no-files-found: error
 
       # ======================
-      # 7) リポジトリに PNG を保存（上書き commit）
+      # 7) PNG をリポジトリに commit（オプション）
       # ======================
       - name: Commit & Push updated PNG
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-          # 変更があるファイルだけ追加
           git add output/FearGreed_Output.png
 
-          # 差分があるか確認して commit（なければ commit しない）
           if ! git diff --cached --quiet; then
             git commit -m "Update FearGreed_Output.png (auto)"
             git push
           else
             echo "No changes to commit"
           fi
-
