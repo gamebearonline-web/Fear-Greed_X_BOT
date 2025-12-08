@@ -6,6 +6,10 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
 import math
 
+# 🔥 投稿文生成モジュール
+from post_common import build_post_text
+
+
 # ============================================================
 #  Google Sheets 認証
 # ============================================================
@@ -203,7 +207,7 @@ def draw_line(draw, xywh, values, color, dot):
 
 
 # ============================================================
-# 右上：日付描画（色を #4D4D4D に固定）
+# 右上：日付描画
 # ============================================================
 def draw_date(draw):
     today = datetime.now()
@@ -212,16 +216,13 @@ def draw_date(draw):
 
     font_date = ImageFont.truetype("noto-sans-jp/NotoSansJP-Regular.otf", 20)
 
-    # 右上座標（テンプレートに合わせて固定）
     x, y, w, h = 1020, 15, 140, 20
-
     tw, th = draw.textbbox((0, 0), date_text, font=font_date)[2:]
-
     draw.text(
         (x + (w - tw)/2, y + (h - th)/2),
         date_text,
         font=font_date,
-        fill="#4D4D4D"   # ← 修正：白 → #4D4D4D
+        fill="#4D4D4D"
     )
 
 
@@ -279,7 +280,7 @@ def generate_image():
     draw_needle(draw, (320, 324), stock["now"])
     draw_needle(draw, (880, 324), crypto["now"])
 
-    # 中央の数字
+    # 中央の大きな番号
     draw_text_center(draw, coords["stock"]["previous"], str(stock["now"]), font_big, value_to_color(stock["now"]))
     draw_text_center(draw, coords["crypto"]["previous"], str(crypto["now"]), font_big, value_to_color(crypto["now"]))
 
@@ -288,7 +289,7 @@ def generate_image():
     draw_line(draw, (gx,gy,gw,gh), get_last30_with_now("StockFear&Greed", stock["now"]), "#f2f2f2", "#ffffff")
     draw_line(draw, (gx,gy,gw,gh), get_last30_with_now("CryptoGreedFear", crypto["now"]), "#f7921a", "#f7921a")
 
-    # 🔥 日付追加（修正版）
+    # 日付
     draw_date(draw)
 
     # 保存
@@ -296,6 +297,13 @@ def generate_image():
     path = "output/FearGreed_Output.png"
     img.save(path)
     print("[SAVED]", path)
+
+    # 🔥🔥 投稿文を post_text.txt に保存 → これが最重要
+    text = build_post_text()
+    with open("post_text.txt", "w", encoding="utf-8") as f:
+        f.write(text)
+    print("[SAVED] post_text.txt")
+
     return path
 
 
