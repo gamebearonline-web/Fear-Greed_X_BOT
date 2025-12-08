@@ -1,29 +1,27 @@
 name: FearGreedBot - Post to Bluesky & Misskey
 
 on:
-  push:
-    paths:
-      - "post_text.txt"       # ← この更新を検知して起動
+  workflow_run:
+    workflows: ["FearGreedBot - Post to X"]
+    types: [completed]
 
 permissions:
   contents: read
 
 jobs:
   post-other:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      # 最新 PNG と post_text.txt をチェック
       - name: Check files
         run: |
-          echo "Checking output/FearGreed_Output.png and post_text.txt ..."
           ls -la output/
           test -f output/FearGreed_Output.png
           test -f post_text.txt
 
-      # Python セットアップ
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -32,7 +30,7 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt atproto requests
 
-      # Bluesky 投稿
+      # Bluesky
       - name: Post to Bluesky
         env:
           BSKY_HANDLE:        ${{ secrets.BSKY_HANDLE }}
@@ -41,11 +39,11 @@ jobs:
           POST_TEXT_PATH:     post_text.txt
         run: python post_bluesky.py
 
-      # Misskey 投稿
+      # Misskey
       - name: Post to Misskey
         env:
-          MISSKEY_HOST:   ${{ secrets.MISSKEY_HOST }}
-          MISSKEY_TOKEN:  ${{ secrets.MISSKEY_TOKEN }}
-          IMAGE_PATH:     output/FearGreed_Output.png
+          MISSKEY_HOST:  ${{ secrets.MISSKEY_HOST }}
+          MISSKEY_TOKEN: ${{ secrets.MISSKEY_TOKEN }}
+          IMAGE_PATH:    output/FearGreed_Output.png
           POST_TEXT_PATH: post_text.txt
         run: python post_misskey.py
