@@ -1,5 +1,5 @@
 # ==========================================
-# post_x.py（post_common 統合版 / 完全版）
+# post_x.py（独立生成・独立投稿・完全版）
 # ==========================================
 import os
 import requests
@@ -19,38 +19,25 @@ RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
 
 auth = OAuth1(API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET)
 
-# ==========================================
-#  共通関数（post_common.py の統合部分）
-# ==========================================
+# ======================================================
+#  共通：投稿文生成ロジック（GAS では作らない）
+# ======================================================
 
-# -------------------------------
-# JST 今日
-# -------------------------------
 def get_today_text():
     now = datetime.utcnow() + timedelta(hours=9)
-    weekday_map = ["月", "火", "水", "木", "金", "土", "日"]
-    return f"{now.strftime('%Y/%m/%d')}（{weekday_map[now.weekday()]}）"
+    weekday = ["月", "火", "水", "木", "金", "土", "日"][now.weekday()]
+    return f"{now.strftime('%Y/%m/%d')}（{weekday}）"
 
 
-# -------------------------------
-# ラベル判定
-# -------------------------------
 def value_to_label(v):
-    if v <= 24:
-        return "Extreme Fear"
-    elif v <= 44:
-        return "Fear"
-    elif v <= 55:
-        return "Neutral"
-    elif v <= 75:
-        return "Greed"
-    else:
-        return "Extreme Greed"
+    if v <= 24:  return "Extreme Fear"
+    if v <= 44:  return "Fear"
+    if v <= 55:  return "Neutral"
+    if v <= 75:  return "Greed"
+    return "Extreme Greed"
 
 
-# -------------------------------
-# Stock FGI（RapidAPI）
-# -------------------------------
+# --- Stock FGI ---
 def get_stock_fgi_with_prev():
     url = "https://fear-and-greed-index.p.rapidapi.com/v1/fgi"
     headers = {
@@ -59,43 +46,30 @@ def get_stock_fgi_with_prev():
     }
 
     data = requests.get(url, headers=headers).json()["fgi"]
-
     now = int(data["now"]["value"])
     prev = int(data["previousClose"]["value"])
     label = value_to_label(now)
-
     return now, prev, label
 
 
-# -------------------------------
-# Crypto FGI（alternative.me）
-# -------------------------------
+# --- Crypto FGI ---
 def get_crypto_fgi_with_prev():
     data = requests.get("https://api.alternative.me/fng/?limit=2").json()["data"]
 
     now = int(data[0]["value"])
     prev = int(data[1]["value"])
     label = value_to_label(now)
-
     return now, prev, label
 
 
-# -------------------------------
-# 差分
-# -------------------------------
 def diff(now, prev):
     d = now - prev
-    if d > 0:
-        return f"(+{d})"
-    elif d < 0:
-        return f"({d})"
-    else:
-        return "(±0)"
+    if d > 0:  return f"(+{d})"
+    if d < 0:  return f"({d})"
+    return "(±0)"
 
 
-# -------------------------------
-# 投稿文作成（X / Bluesky / Misskey 共通）
-# -------------------------------
+# 投稿文生成（SNSごとに独立）
 def build_post_text():
     today = get_today_text()
 
@@ -105,32 +79,27 @@ def build_post_text():
     stock_diff = diff(stock_now, stock_prev)
     crypto_diff = diff(crypto_now, crypto_prev)
 
-    text = (
+    return (
         "CNN・Crypto Fear & Greed Index（恐怖と欲望指数）\n"
         f"{today}\n\n"
         f"⬜Stock：{stock_now}{stock_diff}【{stock_label}】\n"
         f"🟧Bitcoin：{crypto_now}{crypto_diff}【{crypto_label}】"
     )
 
-    return text
+# ======================================================
+#  X投稿
+# ======================================================
 
-
-# ==========================================
-#  X（Twitter）投稿処理
-# ==========================================
-
-def upload_media(image_path):
+def upload_media(path):
     url = "https://upload.twitter.com/1.1/media/upload.json"
+    with open(path, "rb") as f:
+        res = requests.post(url, auth=auth, files={"media": f})
 
-    with open(image_path, "rb") as f:
-        files = {"media": f}
-        response = requests.post(url, auth=auth, files=files)
+    if res.status_code != 200:
+        raise Exception(f"Media Upload Failed: {res.text}")
 
-    if response.status_code != 200:
-        raise Exception(f"Media Upload Failed: {response.text}")
-
-    media_id = response.json()["media_id_string"]
-    print(f"[OK] Media uploaded → {media_id}")
+    media_id = res.json()["media_id_string"]
+    print("[OK] Uploaded media:", media_id)
     return media_id
 
 
@@ -138,40 +107,27 @@ def post_tweet(text, media_id):
     url = "https://api.twitter.com/1.1/statuses/update.json"
     payload = {"status": text, "media_ids": media_id}
 
-    response = requests.post(url, auth=auth, data=payload)
+    res = requests.post(url, auth=auth, data=payload)
+    print("Tweet Response:", res.status_code, res.text)
 
-    print("Tweet status:", response.status_code)
-    print(response.text)
-
-    if response.status_code != 200:
-        raise Exception(f"Tweet Failed: {response.text}")
+    if res.status_code != 200:
+        raise Exception(f"Tweet Failed: {res.text}")
 
 
-# ==========================================
-#  メイン処理
-# ==========================================
+# ======================================================
+#  MAIN
+# ======================================================
 def main():
     print("[INFO] post_x.py started")
 
     if not IMAGE_PATH or not os.path.exists(IMAGE_PATH):
-        raise Exception(f"IMAGE_PATH が存在しません → {IMAGE_PATH}")
+        raise Exception(f"IMAGE_PATH が存在しません → " + str(IMAGE_PATH))
 
-    # 投稿文生成（post_common 統合済み）
-    post_text = build_post_text()
-
-    print("\n=== POST TEXT ===\n" + post_text + "\n")
-
-    # X 投稿
+    text = build_post_text()
     media_id = upload_media(IMAGE_PATH)
-    post_tweet(post_text, media_id)
+    post_tweet(text, media_id)
 
-    print("[OK] Tweet posted successfully!")
-
-    # Bluesky / Misskey 用に保存
-    with open("post_text.txt", "w", encoding="utf-8") as f:
-        f.write(post_text)
-
-    print("[OK] Saved post_text.txt for Bluesky / Misskey")
+    print("[SUCCESS] X投稿完了！")
 
 
 if __name__ == "__main__":
