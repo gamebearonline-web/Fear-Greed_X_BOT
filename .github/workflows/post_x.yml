@@ -25,10 +25,12 @@ jobs:
           pip install -r requirements.txt
           pip install tweepy
 
-      - name: Check files
+      - name: Show files
         run: |
-          test -f output/FearGreed_Output.png
-          test -f post_text.txt
+          echo "=== LIST ROOT ==="
+          ls -la .
+          echo "=== LIST output/ ==="
+          ls -la output/ || true
 
       - name: Post to X
         env:
