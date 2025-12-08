@@ -69,15 +69,15 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-          # 出力画像をリポジトリの output/ に上書きコピー
-          cp output/FearGreed_Output.png ./output/FearGreed_Output.png
-
+          # 変更があるファイルだけ追加
           git add output/FearGreed_Output.png
 
-          # 変更がある場合のみ commit
+          # 差分があるか確認（なければ commit しない）
           if ! git diff --cached --quiet; then
             git commit -m "Update FearGreed_Output.png (auto)"
             git push
           else
             echo "No changes to commit"
+          fi
+
           fi
