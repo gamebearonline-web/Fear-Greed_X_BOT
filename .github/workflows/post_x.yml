@@ -2,7 +2,7 @@ name: FearGreedBot - Post to X
 
 on:
   workflow_run:
-    workflows: ["generate_image"]   # ← 画像生成ワークフロー名
+    workflows: ["generate_image"]
     types:
       - completed
 
@@ -25,9 +25,7 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt
 
-      # ======================
-      # Artifact（最新）を取得
-      # ======================
+      # 画像生成 artifact を取得
       - name: Download latest artifact
         uses: actions/download-artifact@v4
         with:
@@ -40,9 +38,7 @@ jobs:
           ls -la output/
           test -f output/FearGreed_Output.png
 
-      # ======================
-      # X投稿
-      # ======================
+      # X 投稿
       - name: Post to X
         env:
           TWITTER_API_KEY:        ${{ secrets.TWITTER_API_KEY }}
@@ -52,3 +48,16 @@ jobs:
           RAPIDAPI_KEY:           ${{ secrets.RAPIDAPI_KEY }}
           IMAGE_PATH: output/FearGreed_Output.png
         run: python post_x.py
+
+      # ★ 他SNS向け artifact をアップロード（最重要）
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: feargreed-image
+          path: output/FearGreed_Output.png
+
+      - name: Upload post text artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: post_text
+          path: post_text.txt
