@@ -2,7 +2,7 @@ name: FearGreedBot - Post to Bluesky
 
 on:
   workflow_run:
-    workflows: ["generate_image"]
+    workflows: ["FearGreedBot - Post to X"]   # ← ここが最重要（修正点）
     types: [completed]
 
 permissions:
