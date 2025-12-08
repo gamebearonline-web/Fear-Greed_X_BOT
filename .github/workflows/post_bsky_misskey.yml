@@ -2,7 +2,7 @@ name: FearGreedBot - Post to Bluesky & Misskey
 
 on:
   workflow_run:
-    workflows: ["FearGreedBot - Post to X"]   # post_x.yml の name
+    workflows: ["FearGreedBot - Post to X"]   # ← post_x.yml の name
     types:
       - completed
 
@@ -16,41 +16,54 @@ jobs:
 
     steps:
       # ======================
-      # 1) リポジトリ取得
+      # 1) 最新の post_x.yml の run 情報を取得
+      # ======================
+      - name: Get run info
+        id: get_info
+        run: |
+          echo "run_id=${{ github.event.workflow_run.id }}" >> $GITHUB_OUTPUT
+
+      # ======================
+      # 2) リポジトリ取得
       # ======================
       - uses: actions/checkout@v4
 
       # ======================
-      # 2) X ワークフローが出力した投稿文 artifact の取得
-      # ======================
-      - name: Download post_text artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: post_text
-          path: artifacts/
-
-      - name: Show artifact files
-        run: |
-          echo "Artifacts:"
-          ls -la artifacts/
-
-      # ======================
-      # 3) generate_image の artifact（画像）も取得
+      # 3) X 投稿が生成した artifact（画像）を取得
       # ======================
       - name: Download image artifact
         uses: actions/download-artifact@v4
         with:
           name: feargreed-image
-          path: output/
+          path: output
+          run-id: ${{ steps.get_info.outputs.run_id }}
+          repository: ${{ github.repository }}
 
-      - name: Check image
+      - name: Check downloaded image
         run: |
           echo "List output/"
           ls -la output/
           test -f output/FearGreed_Output.png
 
       # ======================
-      # 4) Python セットアップ
+      # 4) X 投稿が生成したテキスト artifact を取得
+      # ======================
+      - name: Download post text artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: post_text
+          path: artifacts
+          run-id: ${{ steps.get_info.outputs.run_id }}
+          repository: ${{ github.repository }}
+
+      - name: View text
+        run: |
+          echo "Artifacts:"
+          ls -la artifacts/
+          cat artifacts/post_text.txt
+
+      # ======================
+      # 5) Python セットアップ
       # ======================
       - uses: actions/setup-python@v5
         with:
@@ -61,7 +74,7 @@ jobs:
         run: pip install -r requirements.txt atproto requests
 
       # ======================
-      # 5) Bluesky 投稿
+      # 6) Bluesky 投稿
       # ======================
       - name: Post to Bluesky
         env:
@@ -72,7 +85,7 @@ jobs:
         run: python post_bluesky.py
 
       # ======================
-      # 6) Misskey 投稿
+      # 7) Misskey 投稿
       # ======================
       - name: Post to Misskey
         env:
