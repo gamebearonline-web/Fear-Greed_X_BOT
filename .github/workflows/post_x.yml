@@ -2,7 +2,7 @@ name: FearGreedBot - Post to X
 
 on:
   workflow_run:
-    workflows: ["generate_image"]
+    workflows: ["generate_image"]   # 画像生成完了後に自動起動
     types: [completed]
 
 permissions:
@@ -14,8 +14,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 最新 PNG を取得
       - uses: actions/checkout@v4
 
+      # Python セットアップ
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -24,57 +26,30 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt
 
-      # =============================================
-      # ★ generate_image の artifact を正しく取得
-      # =============================================
-      - name: Fetch artifact ID
-        id: artifact
+      # PNG の存在チェック
+      - name: Check PNG exists
         run: |
-          echo "Fetching artifact ID..."
-          artifacts=$(gh api \
-            repos/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}/artifacts)
-
-          id=$(echo "$artifacts" | jq '.artifacts[] | select(.name=="feargreed-image") | .id')
-
-          if [ -z "$id" ]; then
-            echo "Artifact feargreed-image not found!"
-            exit 1
-          fi
-
-          echo "artifact_id=$id" >> $GITHUB_OUTPUT
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Download artifact
-        run: |
-          echo "Downloading artifact..."
-          gh api \
-            repos/${{ github.repository }}/actions/artifacts/${{ steps.artifact.outputs.artifact_id }}/zip \
-            --output artifact.zip
-          unzip artifact.zip -d output
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Check image
-        run: |
+          echo "Checking output/FearGreed_Output.png ..."
           ls -la output/
           test -f output/FearGreed_Output.png
 
-      # =============================================
       # X 投稿
-      # =============================================
       - name: Post to X
         env:
           TWITTER_API_KEY:        ${{ secrets.TWITTER_API_KEY }}
           TWITTER_API_SECRET:     ${{ secrets.TWITTER_API_SECRET }}
           TWITTER_ACCESS_TOKEN:   ${{ secrets.TWITTER_ACCESS_TOKEN }}
           TWITTER_ACCESS_SECRET:  ${{ secrets.TWITTER_ACCESS_SECRET }}
-          RAPIDAPI_KEY:           ${{ secrets.RAPIDAPI_KEY }}
           IMAGE_PATH: output/FearGreed_Output.png
         run: python post_x.py
 
-      - name: Upload post_text artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: post_text
-          path: post_text.txt
+      # 投稿文 post_text.txt をリポジトリへ保存（任意）
+      - name: Commit & push post_text
+        run: |
+          if [ -f post_text.txt ]; then
+            git config user.name "github-actions"
+            git config user.email "github-actions@github.com"
+            git add post_text.txt
+            git commit -m "Update post_text.txt (auto)" || echo "No changes"
+            git push
+          fi
