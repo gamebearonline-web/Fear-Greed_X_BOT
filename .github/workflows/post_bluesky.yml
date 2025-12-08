@@ -2,7 +2,7 @@ name: FearGreedBot - Post to Bluesky
 
 on:
   workflow_run:
-    workflows: ["FearGreedBot - Post to X"]   # ← ここが最重要（修正点）
+    workflows: ["generate_image"]
     types: [completed]
 
 permissions:
@@ -21,17 +21,17 @@ jobs:
           python-version: "3.11"
 
       - name: Install deps
-        run: pip install -r requirements.txt atproto
+        run: |
+          pip install -r requirements.txt
+          pip install atproto
 
-      - name: Check files
+      - name: Check image
         run: |
           test -f output/FearGreed_Output.png
-          test -f post_text.txt
 
       - name: Post to Bluesky
         env:
           BSKY_HANDLE:       ${{ secrets.BSKY_HANDLE }}
           BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
           IMAGE_PATH:        output/FearGreed_Output.png
-          POST_TEXT_PATH:    post_text.txt
         run: python post_bluesky.py
