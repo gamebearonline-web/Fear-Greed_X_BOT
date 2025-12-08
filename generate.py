@@ -6,10 +6,6 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
 import math
 
-# 🔥 投稿文生成モジュール
-from post_common import build_post_text
-
-
 # ============================================================
 #  Google Sheets 認証
 # ============================================================
@@ -227,7 +223,7 @@ def draw_date(draw):
 
 
 # ============================================================
-# 🚀 メイン処理
+# 🚀 メイン処理（画像生成のみ）
 # ============================================================
 def generate_image():
 
@@ -297,12 +293,6 @@ def generate_image():
     path = "output/FearGreed_Output.png"
     img.save(path)
     print("[SAVED]", path)
-
-    # 🔥🔥 投稿文を post_text.txt に保存 → これが最重要
-    text = build_post_text()
-    with open("post_text.txt", "w", encoding="utf-8") as f:
-        f.write(text)
-    print("[SAVED] post_text.txt")
 
     return path
 
