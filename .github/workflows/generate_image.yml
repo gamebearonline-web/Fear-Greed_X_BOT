@@ -1,0 +1,62 @@
+name: generate_image
+
+on:
+  workflow_dispatch:   # GAS からの実行を受ける
+
+permissions:
+  contents: read       # リポジトリ読み取りのみで十分
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # ======================
+      # 1) リポジトリ取得
+      # ======================
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ======================
+      # 2) Python セットアップ
+      # ======================
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # ======================
+      # 3) ライブラリインストール
+      # ======================
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      # ======================
+      # 4) Google 認証ファイル復元
+      # ======================
+      - name: Restore Google service account key
+        run: |
+          echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
+          chmod 600 service-account.json
+
+      # ======================
+      # 5) Fear & Greed 画像生成
+      # ======================
+      - name: Run image generator
+        env:
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+        run: python generate.py
+
+      # ======================
+      # 6) PNG を artifact に保存
+      # ======================
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: feargreed-image
+          path: output/FearGreed_Output.png
+          if-no-files-found: error
