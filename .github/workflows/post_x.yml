@@ -1,23 +1,21 @@
 name: FearGreedBot - Post to X
 
 on:
-  push:
-    paths:
-      - "output/FearGreed_Output.png"   # PNG 更新時のみ発火
+  workflow_run:
+    workflows: ["generate_image"]
+    types: [completed]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   post-x:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      # Python セットアップ
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -26,14 +24,12 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt
 
-      # PNG 存在チェック
-      - name: Check PNG exists
+      - name: Check PNG & text
         run: |
-          echo "Checking output/FearGreed_Output.png ..."
           ls -la output/
           test -f output/FearGreed_Output.png
+          test -f post_text.txt
 
-      # X 投稿
       - name: Post to X
         env:
           TWITTER_API_KEY:        ${{ secrets.TWITTER_API_KEY }}
@@ -41,16 +37,5 @@ jobs:
           TWITTER_ACCESS_TOKEN:   ${{ secrets.TWITTER_ACCESS_TOKEN }}
           TWITTER_ACCESS_SECRET:  ${{ secrets.TWITTER_ACCESS_SECRET }}
           IMAGE_PATH: output/FearGreed_Output.png
+          POST_TEXT_PATH: post_text.txt
         run: python post_x.py
-
-      # 生成された投稿文 post_text.txt を commit
-      - name: Commit & push post_text.txt
-        run: |
-          if [ -f post_text.txt ]; then
-            git config user.name "github-actions"
-            git config user.email "github-actions@github.com"
-
-            git add post_text.txt
-            git commit -m "Update post_text.txt (auto)" || echo "No changes"
-            git push
-          fi
