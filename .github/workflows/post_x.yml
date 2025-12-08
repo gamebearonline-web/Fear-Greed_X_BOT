@@ -1,10 +1,12 @@
 name: FearGreedBot - Post to X
 
 on:
+  workflow_dispatch:
   workflow_run:
     workflows: ["generate_image"]
     types:
       - completed
+
 
 permissions:
   contents: read
