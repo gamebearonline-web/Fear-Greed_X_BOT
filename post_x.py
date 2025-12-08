@@ -1,5 +1,5 @@
 # ==========================================
-# post_x.py（独立生成・独立投稿・完全版）
+# post_x.py（独立生成・独立投稿・完全安定版）
 # ==========================================
 import os
 import requests
@@ -19,8 +19,9 @@ RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
 
 auth = OAuth1(API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET)
 
+
 # ======================================================
-#  共通：投稿文生成ロジック（GAS では作らない）
+#  共通関数
 # ======================================================
 
 def get_today_text():
@@ -30,14 +31,16 @@ def get_today_text():
 
 
 def value_to_label(v):
-    if v <= 24:  return "Extreme Fear"
-    if v <= 44:  return "Fear"
-    if v <= 55:  return "Neutral"
-    if v <= 75:  return "Greed"
+    if v <= 24: return "Extreme Fear"
+    if v <= 44: return "Fear"
+    if v <= 55: return "Neutral"
+    if v <= 75: return "Greed"
     return "Extreme Greed"
 
 
-# --- Stock FGI ---
+# ======================================================
+#  🔥 安定版 Stock FGI 取得
+# ======================================================
 def get_stock_fgi_with_prev():
     url = "https://fear-and-greed-index.p.rapidapi.com/v1/fgi"
     headers = {
@@ -45,20 +48,41 @@ def get_stock_fgi_with_prev():
         "x-rapidapi-host": "fear-and-greed-index.p.rapidapi.com",
     }
 
-    data = requests.get(url, headers=headers).json()["fgi"]
-    now = int(data["now"]["value"])
-    prev = int(data["previousClose"]["value"])
+    res = requests.get(url, headers=headers)
+    data = res.json()
+
+    print("[DEBUG] Stock FGI Response:", data)
+
+    # --- fgi がない場合（APIエラーなど）
+    if "fgi" not in data:
+        raise Exception(f"[ERROR] API returned unexpected format → {data}")
+
+    fgi = data["fgi"]
+
+    now = int(fgi["now"]["value"])
+    prev = int(fgi["previousClose"]["value"])
     label = value_to_label(now)
+
     return now, prev, label
 
 
-# --- Crypto FGI ---
+# ======================================================
+#  Crypto FGI
+# ======================================================
 def get_crypto_fgi_with_prev():
-    data = requests.get("https://api.alternative.me/fng/?limit=2").json()["data"]
+    url = "https://api.alternative.me/fng/?limit=2"
+    res = requests.get(url)
+    data = res.json()
 
-    now = int(data[0]["value"])
-    prev = int(data[1]["value"])
+    print("[DEBUG] Crypto FGI Response:", data)
+
+    if "data" not in data:
+        raise Exception(f"[ERROR] Crypto API format error → {data}")
+
+    now = int(data["data"][0]["value"])
+    prev = int(data["data"][1]["value"])
     label = value_to_label(now)
+
     return now, prev, label
 
 
@@ -69,7 +93,9 @@ def diff(now, prev):
     return "(±0)"
 
 
-# 投稿文生成（SNSごとに独立）
+# ======================================================
+#  投稿文生成
+# ======================================================
 def build_post_text():
     today = get_today_text()
 
@@ -86,17 +112,17 @@ def build_post_text():
         f"🟧Bitcoin：{crypto_now}{crypto_diff}【{crypto_label}】"
     )
 
+
 # ======================================================
 #  X投稿
 # ======================================================
-
 def upload_media(path):
     url = "https://upload.twitter.com/1.1/media/upload.json"
     with open(path, "rb") as f:
         res = requests.post(url, auth=auth, files={"media": f})
 
     if res.status_code != 200:
-        raise Exception(f"Media Upload Failed: {res.text}")
+        raise Exception(f"[ERROR] Media Upload Failed: {res.text}")
 
     media_id = res.json()["media_id_string"]
     print("[OK] Uploaded media:", media_id)
@@ -111,7 +137,7 @@ def post_tweet(text, media_id):
     print("Tweet Response:", res.status_code, res.text)
 
     if res.status_code != 200:
-        raise Exception(f"Tweet Failed: {res.text}")
+        raise Exception(f"[ERROR] Tweet Failed: {res.text}")
 
 
 # ======================================================
@@ -121,9 +147,11 @@ def main():
     print("[INFO] post_x.py started")
 
     if not IMAGE_PATH or not os.path.exists(IMAGE_PATH):
-        raise Exception(f"IMAGE_PATH が存在しません → " + str(IMAGE_PATH))
+        raise Exception(f"[ERROR] IMAGE_PATH が存在しません → {IMAGE_PATH}")
 
+    # 投稿文生成（ここが落ちないように改良済み）
     text = build_post_text()
+
     media_id = upload_media(IMAGE_PATH)
     post_tweet(text, media_id)
 
