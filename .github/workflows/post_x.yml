@@ -25,7 +25,7 @@ jobs:
         run: pip install -r requirements.txt
 
       # ======================
-      # 画像 artifact の取得
+      # 画像 artifact の取得（前の run-id の artifact を厳密に参照）
       # ======================
       - name: Download latest artifact
         uses: actions/download-artifact@v4
@@ -33,6 +33,7 @@ jobs:
           name: feargreed-image
           path: output
           run-id: ${{ github.event.workflow_run.id }}
+          repository: ${{ github.repository }}   # ★ 追加必須！
 
       - name: Check downloaded image
         run: |
