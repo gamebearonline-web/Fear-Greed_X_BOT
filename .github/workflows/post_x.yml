@@ -2,7 +2,7 @@ name: FearGreedBot - Post to X
 
 on:
   workflow_run:
-    workflows: ["generate_image"]   # 画像生成完了後に自動起動
+    workflows: ["generate_image"]
     types: [completed]
 
 permissions:
@@ -24,26 +24,45 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt
 
-      # ======================
-      # 画像 artifact の取得（前の run-id の artifact を厳密に参照）
-      # ======================
-      - name: Download latest artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: feargreed-image
-          path: output
-          run-id: ${{ github.event.workflow_run.id }}
-          repository: ${{ github.repository }}   # ★ 追加必須！
-
-      - name: Check downloaded image
+      # =============================================
+      # ★ generate_image の artifact を正しく取得
+      # =============================================
+      - name: Fetch artifact ID
+        id: artifact
         run: |
-          echo "List output/"
+          echo "Fetching artifact ID..."
+          artifacts=$(gh api \
+            repos/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}/artifacts)
+
+          id=$(echo "$artifacts" | jq '.artifacts[] | select(.name=="feargreed-image") | .id')
+
+          if [ -z "$id" ]; then
+            echo "Artifact feargreed-image not found!"
+            exit 1
+          fi
+
+          echo "artifact_id=$id" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download artifact
+        run: |
+          echo "Downloading artifact..."
+          gh api \
+            repos/${{ github.repository }}/actions/artifacts/${{ steps.artifact.outputs.artifact_id }}/zip \
+            --output artifact.zip
+          unzip artifact.zip -d output
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check image
+        run: |
           ls -la output/
           test -f output/FearGreed_Output.png
 
-      # ======================
-      # X に投稿して post_text.txt を生成
-      # ======================
+      # =============================================
+      # X 投稿
+      # =============================================
       - name: Post to X
         env:
           TWITTER_API_KEY:        ${{ secrets.TWITTER_API_KEY }}
@@ -54,12 +73,8 @@ jobs:
           IMAGE_PATH: output/FearGreed_Output.png
         run: python post_x.py
 
-      # ======================
-      # 他SNS用 投稿文を artifact 化
-      # ======================
       - name: Upload post_text artifact
         uses: actions/upload-artifact@v4
         with:
           name: post_text
           path: post_text.txt
-          if-no-files-found: error
