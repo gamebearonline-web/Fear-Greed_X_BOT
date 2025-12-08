@@ -14,10 +14,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Get run info
-        id: info
-        run: echo "run_id=${{ github.event.workflow_run.id }}" >> $GITHUB_OUTPUT
-
       - uses: actions/checkout@v4
 
       # ======================
@@ -28,7 +24,7 @@ jobs:
         with:
           name: feargreed-image
           path: output
-          run-id: ${{ steps.info.outputs.run_id }}
+          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Check image
         run: |
@@ -43,7 +39,7 @@ jobs:
         with:
           name: post_text
           path: artifacts
-          run-id: ${{ steps.info.outputs.run_id }}
+          run-id: ${{ github.event.workflow_run.id }}
 
       - name: View text
         run: |
