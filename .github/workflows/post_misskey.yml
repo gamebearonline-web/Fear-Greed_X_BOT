@@ -23,10 +23,10 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt requests
 
-      - name: Check files
+      - name: Check image
         run: |
-          test -f output/FearGreed_Output.png
-          test -f post_text.txt
+         test -f output/FearGreed_Output.png
+
 
       - name: Post to Misskey
         env:
