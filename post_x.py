@@ -1,7 +1,7 @@
 import os
 import requests
 from requests_oauthlib import OAuth1
-from datetime import datetime, timedelta
+from post_common import build_post_text   # ← 共通テキスト生成を使用
 
 # ==========================
 #  OAuth1 認証
@@ -11,89 +11,8 @@ API_SECRET = os.getenv("TWITTER_API_SECRET")
 ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
 ACCESS_SECRET = os.getenv("TWITTER_ACCESS_SECRET")
 IMAGE_PATH = os.getenv("IMAGE_PATH")
-RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
 
 auth = OAuth1(API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET)
-
-
-# ==========================
-# JST 今日の日付
-# ==========================
-def get_today_text():
-    now = datetime.utcnow() + timedelta(hours=9)
-    weekday_map = ["月", "火", "水", "木", "金", "土", "日"]
-    return f"{now.strftime('%Y/%m/%d')}（{weekday_map[now.weekday()]}）"
-
-
-# ==========================
-# ラベル判定
-# ==========================
-def value_to_label(v):
-    if v <= 24:
-        return "Extreme Fear"
-    elif v <= 44:
-        return "Fear"
-    elif v <= 55:
-        return "Neutral"
-    elif v <= 75:
-        return "Greed"
-    else:
-        return "Extreme Greed"
-
-
-# ==========================
-# Stock FGI（前回との差含む）
-# ==========================
-def get_stock_fgi_with_prev():
-    if not RAPIDAPI_KEY:
-        raise Exception("RAPIDAPI_KEY が設定されていません（Stock FGI 用）")
-
-    url = "https://fear-and-greed-index.p.rapidapi.com/v1/fgi"
-    headers = {
-        "x-rapidapi-key": RAPIDAPI_KEY,
-        "x-rapidapi-host": "fear-and-greed-index.p.rapidapi.com",
-    }
-
-    data = requests.get(url, headers=headers).json()["fgi"]
-
-    now = int(data["now"]["value"])
-    prev = int(data["previousClose"]["value"])
-    label = value_to_label(now)
-
-    return now, prev, label
-
-
-# ==========================
-# Crypto FGI（前回との差含む）
-# ==========================
-def get_crypto_fgi_with_prev():
-    data = requests.get("https://api.alternative.me/fng/?limit=2").json()["data"]
-
-    now = int(data[0]["value"])
-    prev = int(data[1]["value"])
-    label = value_to_label(now)
-
-    return now, prev, label
-
-
-# ==========================
-# 差分
-# ==========================
-def diff(now, prev):
-    d = now - prev
-    if d > 0:
-        return f"(+{d})"
-    elif d < 0:
-        return f"({d})"
-    else:
-        return "(±0)"
-
-
-# ==========================
-# 投稿文生成
-# ==========================
-from post_common import build_post_text
-
 
 
 # ==========================
@@ -144,13 +63,21 @@ def main():
     if not IMAGE_PATH:
         raise Exception("IMAGE_PATH が設定されていません（投稿画像パス）")
 
+    # 共通投稿文を作成
     post_text = build_post_text()
     print("\n=== POST TEXT ===\n" + post_text + "\n")
 
+    # X 投稿
     media_id = upload_media(IMAGE_PATH)
     post_tweet(post_text, media_id)
 
     print("[OK] Tweet posted successfully!")
+
+    # ★ 他SNS用に投稿文を保存
+    with open("post_text.txt", "w", encoding="utf-8") as f:
+        f.write(post_text)
+
+    print("[OK] Saved post_text.txt for Bluesky / Misskey")
 
 
 if __name__ == "__main__":
