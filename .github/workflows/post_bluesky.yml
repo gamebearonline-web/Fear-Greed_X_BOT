@@ -2,41 +2,36 @@ name: FearGreedBot - Post to Bluesky
 
 on:
   workflow_run:
-    workflows: ["FearGreedBot - Post to X"]
+    workflows: ["generate_image"]
     types: [completed]
 
 permissions:
   contents: read
 
 jobs:
-  post-bsky:
+  post-bluesky:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
-      # 1) リポジトリ取得
       - uses: actions/checkout@v4
 
-      # 2) PNG の存在チェック（post_text.txt は不要）
-      - name: Check PNG
-        run: |
-          ls -la output/
-          test -f output/FearGreed_Output.png
-
-      # 3) Python セットアップ
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
 
-      # 4) ライブラリ
       - name: Install deps
         run: pip install -r requirements.txt atproto
 
-      # 5) Bluesky 投稿
+      - name: Check files
+        run: |
+          test -f output/FearGreed_Output.png
+          test -f post_text.txt
+
       - name: Post to Bluesky
         env:
-          BSKY_HANDLE:        ${{ secrets.BSKY_HANDLE }}
-          BSKY_APP_PASSWORD:  ${{ secrets.BSKY_APP_PASSWORD }}
-          IMAGE_PATH:         output/FearGreed_Output.png
+          BSKY_HANDLE:       ${{ secrets.BSKY_HANDLE }}
+          BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
+          IMAGE_PATH:        output/FearGreed_Output.png
+          POST_TEXT_PATH:    post_text.txt
         run: python post_bluesky.py
