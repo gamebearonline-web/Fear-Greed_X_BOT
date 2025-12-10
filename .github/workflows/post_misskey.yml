@@ -1,12 +1,13 @@
-name: FearGreedBot - Post to Misskey
+name: FGI - Post to Misskey
 
 on:
   workflow_run:
-    workflows: ["FearGreedBot - Post to Bluesky"]   # ← Bluesky 成功後に起動
+    workflows: ["FGI - Post to Bluesky"]
     types: [completed]
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   post-misskey:
@@ -20,19 +21,19 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install deps
-        run: |
-          pip install -r requirements.txt
-          pip install requests
+      - run: pip install -r requirements.txt
+      - run: pip install requests
 
-      - name: Check image
-        run: |
-          test -f output/FearGreed_Output.png
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: fgi-image
+          path: fgi-image
 
       - name: Post to Misskey
         env:
-          MISSKEY_HOST:   ${{ secrets.MISSKEY_HOST }}
-          MISSKEY_TOKEN:  ${{ secrets.MISSKEY_TOKEN }}
-          IMAGE_PATH:     output/FearGreed_Output.png
-          RAPIDAPI_KEY:   ${{ secrets.RAPIDAPI_KEY }}    # ← ★ 必須 ★
+          MISSKEY_HOST:  ${{ secrets.MISSKEY_HOST }}
+          MISSKEY_TOKEN: ${{ secrets.MISSKEY_TOKEN }}
+          RAPIDAPI_KEY:  ${{ secrets.RAPIDAPI_KEY }}
+          IMAGE_PATH:    fgi-image/FearGreed_Output.png
         run: python post_misskey.py
