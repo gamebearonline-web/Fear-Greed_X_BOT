@@ -1,5 +1,5 @@
 # ==========================================
-# post_bluesky.py（独立生成・完全版）
+# post_bluesky.py（独立生成・完全修正版）
 # ==========================================
 import os
 import requests
@@ -17,7 +17,7 @@ RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
 
 
 # ==========================================
-# 共通ロジック（X版と同じ）
+# 共通ロジック
 # ==========================================
 
 def get_today_text():
@@ -34,27 +34,65 @@ def value_to_label(v):
     return "Extreme Greed"
 
 
-# --- Stock FGI ---
+# ==========================================
+# 🔥 Stock FGI（RapidAPI）安全版
+# ==========================================
 def get_stock_fgi_with_prev():
+
     url = "https://fear-and-greed-index.p.rapidapi.com/v1/fgi"
     headers = {
         "x-rapidapi-key": RAPIDAPI_KEY,
         "x-rapidapi-host": "fear-and-greed-index.p.rapidapi.com",
     }
-    data = requests.get(url, headers=headers).json()["fgi"]
 
-    now = int(data["now"]["value"])
-    prev = int(data["previousClose"]["value"])
+    res = requests.get(url, headers=headers)
+
+    try:
+        data = res.json()
+    except Exception as e:
+        print("[ERROR] RapidAPI JSON decode error:", e)
+        print("[ERROR] Response text:", res.text)
+        raise Exception("RapidAPI が JSON を返していません")
+
+    print("[DEBUG] RapidAPI response:", data)
+
+    # --- 柔軟: fgi が無ければ data の下を探索 --------------------
+    if "fgi" in data:
+        fgi = data["fgi"]
+    elif "data" in data:
+        # 新仕様の可能性
+        fgi = data["data"]
+    else:
+        raise Exception(f"[ERROR] レスポンスに fgi がありません → {data}")
+
+    try:
+        now = int(fgi["now"]["value"])
+        prev = int(fgi["previousClose"]["value"])
+    except Exception as e:
+        print("[ERROR] FGI構造が想定外:", fgi)
+        raise e
+
     label = value_to_label(now)
     return now, prev, label
 
 
-# --- Crypto FGI ---
+# ==========================================
+# Crypto Fear & Greed（alternative.me）
+# ==========================================
 def get_crypto_fgi_with_prev():
-    data = requests.get("https://api.alternative.me/fng/?limit=2").json()["data"]
+    url = "https://api.alternative.me/fng/?limit=2"
 
-    now = int(data[0]["value"])
-    prev = int(data[1]["value"])
+    res = requests.get(url)
+    data = res.json()
+
+    try:
+        values = data["data"]
+        now = int(values[0]["value"])
+        prev = int(values[1]["value"])
+    except Exception as e:
+        print("[ERROR] Crypto API 構造エラー:", data)
+        raise e
+
     label = value_to_label(now)
     return now, prev, label
 
@@ -66,7 +104,9 @@ def diff(now, prev):
     return "(±0)"
 
 
-# --- Bluesky 投稿文生成 ---
+# ==========================================
+# Bluesky 投稿文生成
+# ==========================================
 def build_post_text():
     today = get_today_text()
 
@@ -93,7 +133,7 @@ def main():
     if not IMAGE_PATH or not os.path.exists(IMAGE_PATH):
         raise Exception(f"[ERROR] 画像が存在しません → {IMAGE_PATH}")
 
-    # 投稿文生成（post_text.txt は使わない）
+    # 投稿文生成
     text = build_post_text()
     print("\n--- POST TEXT (Bluesky) ---\n" + text + "\n")
 
