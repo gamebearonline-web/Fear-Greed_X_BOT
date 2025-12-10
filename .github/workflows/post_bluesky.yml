@@ -1,12 +1,13 @@
-name: FearGreedBot - Post to Bluesky
+name: FGI - Post to Bluesky
 
 on:
   workflow_run:
-    workflows: ["generate_image"]
+    workflows: ["FGI - Generate Image"]
     types: [completed]
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   post-bluesky:
@@ -20,19 +21,19 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install deps
-        run: |
-          pip install -r requirements.txt
-          pip install atproto
+      - run: pip install -r requirements.txt
+      - run: pip install atproto
 
-      - name: Check image
-        run: |
-          test -f output/FearGreed_Output.png
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: fgi-image
+          path: fgi-image
 
       - name: Post to Bluesky
         env:
           BSKY_HANDLE:       ${{ secrets.BSKY_HANDLE }}
           BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
-          IMAGE_PATH:        output/FearGreed_Output.png
-          RAPIDAPI_KEY:      ${{ secrets.RAPIDAPI_KEY }}     # ←★★★ これが必要
+          RAPIDAPI_KEY:      ${{ secrets.RAPIDAPI_KEY }}
+          IMAGE_PATH:        fgi-image/FearGreed_Output.png
         run: python post_bluesky.py
