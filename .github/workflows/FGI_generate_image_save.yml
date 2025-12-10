@@ -1,4 +1,4 @@
-name: FGI - Generate Image (SAVE)
+name: FGI Generate Image & Save
 
 on:
   workflow_dispatch:
@@ -23,27 +23,17 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt
 
-      # ==============================
-      # ★ PNG を生成して output に保存
-      # ==============================
       - name: Run FGI image generator (SAVE)
-        env:
-          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
-        run: python generate.py --output output/FearGreed_Output.png
+        run: python generate.py --output FGI_Latest.png
 
-      # ==============================
-      # ★ Git に ALWAYS COMMIT（スプラ方式）
-      # ==============================
-      - name: Commit and Push (always commit)
+      - name: Commit & Push latest PNG
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # 画像をステージ
-          git add output/FearGreed_Output.png
+          mkdir -p LatestPNG
+          mv FGI_Latest.png LatestPNG/FGI_Latest.png
 
-          # 差分がなくても必ずコミット
-          git commit --allow-empty -m "Update FearGreed_Output.png (force)"
-
-          # main に push
+          git add LatestPNG/FGI_Latest.png
+          git commit --allow-empty -m "Update FGI_Latest.png (auto save)"
           git push origin HEAD:main
