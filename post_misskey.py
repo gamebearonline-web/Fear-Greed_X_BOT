@@ -1,5 +1,5 @@
 # ==========================================
-# post_misskey.py（独立生成・完全版）
+# post_misskey.py（独立生成・完全修正版）
 # ==========================================
 import os
 import requests
@@ -28,27 +28,63 @@ def value_to_label(v):
     return "Extreme Greed"
 
 
-# --- Stock FGI ---
+# ==========================================
+# 🔥 Stock FGI（RapidAPI）安全版
+# ==========================================
 def get_stock_fgi_with_prev():
     url = "https://fear-and-greed-index.p.rapidapi.com/v1/fgi"
     headers = {
         "x-rapidapi-key": RAPIDAPI_KEY,
         "x-rapidapi-host": "fear-and-greed-index.p.rapidapi.com",
     }
-    data = requests.get(url, headers=headers).json()["fgi"]
 
-    now = int(data["now"]["value"])
-    prev = int(data["previousClose"]["value"])
+    res = requests.get(url, headers=headers)
+
+    try:
+        data = res.json()
+    except Exception as e:
+        print("[ERROR] RapidAPI JSON decode error:", e)
+        print("[ERROR] Response text:", res.text)
+        raise Exception("RapidAPI が JSON を返していません")
+
+    print("[DEBUG] RapidAPI response:", data)
+
+    # --- fgi / data どちらでも対応 ------------------------
+    if "fgi" in data:
+        fgi = data["fgi"]
+    elif "data" in data:
+        fgi = data["data"]
+    else:
+        raise Exception(f"[ERROR] レスポンスに fgi がありません → {data}")
+
+    try:
+        now = int(fgi["now"]["value"])
+        prev = int(fgi["previousClose"]["value"])
+    except Exception as e:
+        print("[ERROR] FGI構造が想定外:", fgi)
+        raise e
+
     label = value_to_label(now)
     return now, prev, label
 
 
-# --- Crypto FGI ---
+# ==========================================
+# Crypto FGI（alternative.me）安全版
+# ==========================================
 def get_crypto_fgi_with_prev():
-    data = requests.get("https://api.alternative.me/fng/?limit=2").json()["data"]
+    url = "https://api.alternative.me/fng/?limit=2"
 
-    now = int(data[0]["value"])
-    prev = int(data[1]["value"])
+    res = requests.get(url)
+    data = res.json()
+
+    try:
+        values = data["data"]
+        now = int(values[0]["value"])
+        prev = int(values[1]["value"])
+    except Exception as e:
+        print("[ERROR] Crypto API 構造エラー:", data)
+        raise e
+
     label = value_to_label(now)
     return now, prev, label
 
