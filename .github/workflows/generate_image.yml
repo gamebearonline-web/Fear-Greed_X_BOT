@@ -1,10 +1,10 @@
-name: FGI - Generate Image
+name: generate_image
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate:
@@ -13,22 +13,30 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Generate FGI Image
+      # ⭐ ここが絶対に必要
+      - name: Restore Google service account key
+        run: |
+          echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
+          chmod 600 service-account.json
+
+      # ⭐ PNG 生成
+      - name: Run generator
         env:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
         run: python generate.py --output /tmp/FearGreed_Output.png
 
-      - name: Upload image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: fgi-image
-          path: /tmp/FearGreed_Output.png
-          if-no-files-found: error
+      # ⭐ PNG を保存（任意：Git に保存したい場合）
+      - name: Save output
+        run: |
+          mkdir -p output
+          cp /tmp/FearGreed_Output.png output/FearGreed_Output.png
