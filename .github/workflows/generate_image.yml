@@ -1,10 +1,10 @@
-name: generate_image
+name: FGI - Generate Image
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   generate:
@@ -13,78 +13,22 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: pip
+          python-version: "3.11"
 
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Restore Google service account key
-        run: |
-          echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
-          chmod 600 service-account.json
-
-      - name: Run generator
+      - name: Generate FGI Image
         env:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
-        run: python generate.py
+        run: python generate.py --output /tmp/FearGreed_Output.png
 
-
-      #  ⭐ 今日の日付を保存して、前回と違えば必ず更新対象にする
-      - name: Check date change
-        id: datecheck
-        run: |
-          TODAY=$(date +"%Y/%m/%d")
-          echo "today=$TODAY" >> $GITHUB_OUTPUT
-
-          if [ -f last_date.txt ]; then
-            LAST=$(cat last_date.txt)
-          else
-            LAST="none"
-          fi
-
-          echo "last=$LAST" >> $GITHUB_OUTPUT
-
-          if [ "$TODAY" != "$LAST" ]; then
-            echo "date_changed=true" >> $GITHUB_OUTPUT
-          else
-            echo "date_changed=false" >> $GITHUB_OUTPUT
-          fi
-
-
-      - name: Commit & Push updated PNG and post_text
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-
-          git pull origin main --rebase || true
-
-          # ⭐ 常に生成されたファイルを add
-          git add output/FearGreed_Output.png
-          git add post_text.txt
-          git add last_date.txt || true
-
-          # ⭐ 今日の日付で上書き
-          echo "${{ steps.datecheck.outputs.today }}" > last_date.txt
-          git add last_date.txt
-
-          # ⭐ 日付が変わった日は必ず commit
-          if [ "${{ steps.datecheck.outputs.date_changed }}" = "true" ]; then
-            echo "📅 日付が変わったため必ず commit します"
-            git commit -m "Daily update (date changed)" || true
-            git push
-            exit 0
-          fi
-
-          # ⭐ 数値変化が無い場合だけ commit をスキップ
-          if ! git diff --cached --quiet; then
-            git commit -m "Update FearGreed output (auto)"
-            git push
-          else
-            echo "No numeric changes → Skip"
-          fi
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fgi-image
+          path: /tmp/FearGreed_Output.png
+          if-no-files-found: error
