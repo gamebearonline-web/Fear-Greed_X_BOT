@@ -1,4 +1,5 @@
-name: FGI_generate_image_save
+name: generate_image
+
 on:
   workflow_dispatch:
 
@@ -6,41 +7,36 @@ permissions:
   contents: write
 
 jobs:
-  save-latest:
+  generate:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: true
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
-      - name: Install deps
+      - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # 🔐 service-account.json を復元
-      - name: Restore service-account.json
+      # ⭐ ここが絶対に必要
+      - name: Restore Google service account key
         run: |
           echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
           chmod 600 service-account.json
 
-      # 🔥 Fear Greed 画像生成（ローカル保存）
+      # ⭐ PNG 生成
       - name: Run generator
-        run: python generate.py
+        env:
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+        run: python generate.py --output /tmp/FearGreed_Output.png
 
-      # 🔥 output フォルダの PNG を GitHub に保存（毎回コミット）
-      - name: Commit & Push latest PNG
+      # ⭐ PNG を保存（任意：Git に保存したい場合）
+      - name: Save output
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          mkdir -p LatestPNG
-          cp output/FearGreed_Output.png LatestPNG/FGI_Latest.png
-
-          git add LatestPNG/FGI_Latest.png
-          git commit --allow-empty -m "Update FGI_Latest.png (auto-save)"
-          git push origin HEAD:main
+          mkdir -p output
+          cp /tmp/FearGreed_Output.png output/FearGreed_Output.png
