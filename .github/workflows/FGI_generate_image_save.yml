@@ -11,11 +11,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ------------------------------------
+      # ① リポジトリを取得
+      # ------------------------------------
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: true
 
+      # ------------------------------------
+      # ② Python セットアップ
+      # ------------------------------------
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -23,13 +29,17 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt
 
-      # 🔐 service-account.json 復元
+      # ------------------------------------
+      # ③ Google 認証ファイルを復元
+      # ------------------------------------
       - name: Restore service-account.json
         run: |
           echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
           chmod 600 service-account.json
 
-      # 🔥 Fear Greed 画像生成
+      # ------------------------------------
+      # ④ 画像生成（generate.py）
+      # ------------------------------------
       - name: Run generator
         env:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
@@ -37,23 +47,31 @@ jobs:
           mkdir -p output
           python generate.py --output output/FearGreed_Output.png
 
-      # 📤 投稿用 PNG を artifact としてアップロード
-      - name: Upload PNG Artifact
+      # ------------------------------------
+      # ⑤ Artifact（投稿用 PNG）
+      # ------------------------------------
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: FGI_Image
           path: output/FearGreed_Output.png
           retention-days: 1
 
-      # 📌 GitHub 確認用 PNG を保存 (LatestPNG に)
-      - name: Commit & Push latest PNG
+      # ------------------------------------
+      # ⑥ GitHub へ PNG を保存（スプラ方式＋ output も更新）
+      # ------------------------------------
+      - name: Commit & Push Images
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+          # LatestPNG フォルダに最新版を保存（確認用）
           mkdir -p LatestPNG
           cp output/FearGreed_Output.png LatestPNG/FGI_Latest.png
 
+          # Git にステージするファイル
+          git add output/FearGreed_Output.png
           git add LatestPNG/FGI_Latest.png
-          git commit --allow-empty -m "Update FGI_Latest.png (auto-save)"
+
+          git commit --allow-empty -m "Update FGI images (auto-save)"
           git push origin HEAD:main
