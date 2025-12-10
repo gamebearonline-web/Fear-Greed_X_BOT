@@ -43,11 +43,12 @@ def get_sheet(sheet_name):
 
 
 # ======================================
-# Crypto：1年前の値
+# Crypto：1年前の値（JSTで照合）
 # ======================================
 def get_crypto_one_year_ago():
     ws = get_sheet("CryptoGreedFear")
-    target = (datetime.utcnow() + timedelta(hours=9) - timedelta(days=365)).strftime("%Y/%m/%d")
+    JST = datetime.utcnow() + timedelta(hours=9)
+    target = (JST - timedelta(days=365)).strftime("%Y/%m/%d")
 
     for r in ws.get_all_values()[1:]:
         if r[0] == target:
@@ -81,12 +82,21 @@ def get_stock_fgi():
 
 
 # ======================================
-# Stock FGI → 履歴追記
+# Stock FGI → 履歴追記（★ 土日は絶対に更新しない仕様）
 # ======================================
 def append_stock_history(stock):
     ws = get_sheet("StockFear&Greed")
     exist = {r[0] for r in ws.get_all_values()[1:]}
-    today = datetime.utcnow() + timedelta(hours=9)
+
+    JST = datetime.utcnow() + timedelta(hours=9)
+    weekday = JST.weekday()   # 月=0 ... 日=6
+
+    # ★★★ 土日はシートに書かない（画像生成はする）
+    if weekday >= 5:
+        print("[SKIP] Weekend → StockFear&Greed の追記なし")
+        return
+
+    today = JST
 
     points = [
         (today,                     stock["now"]),
@@ -100,6 +110,7 @@ def append_stock_history(stock):
         d = dt.strftime("%Y/%m/%d")
         if d not in exist:
             ws.append_row([d, v])
+            print(f"[ADD] StockFear&Greed → {d}: {v}")
 
 
 # ======================================
@@ -117,21 +128,23 @@ def get_crypto_fgi():
 
 
 # ======================================
-# Crypto 履歴追記
+# Crypto 履歴追記（毎日追加 OK）
 # ======================================
 def append_last_7days_crypto(raw):
     ws = get_sheet("CryptoGreedFear")
     exist = {r[0] for r in ws.get_all_values()[1:]}
 
     for d in reversed(raw[:7]):
-        dt = datetime.fromtimestamp(int(d["timestamp"])) + timedelta(hours=9)  # JST
+        dt = datetime.fromtimestamp(int(d["timestamp"])) + timedelta(hours=9)
         date = dt.strftime("%Y/%m/%d")
+
         if date not in exist:
             ws.append_row([date, int(d["value"]), d["value_classification"]])
+            print(f"[ADD] CryptoGreedFear → {date}: {int(d['value'])}")
 
 
 # ======================================
-# グラフ用データ
+# グラフ用データ（過去29 + 今日 = 30点）
 # ======================================
 def get_last30_with_now(sheet, now_value):
     ws = get_sheet(sheet)
@@ -195,7 +208,7 @@ def draw_needle(draw, center, value, length=200):
 
 
 # --------------------------------------
-# 折れ線
+# 折れ線グラフ
 # --------------------------------------
 def draw_line(draw, box, values, color, dot):
     x,y,w,h = box
@@ -206,6 +219,7 @@ def draw_line(draw, box, values, color, dot):
         pts.append((px,py))
 
     draw.line(pts, fill=color, width=3)
+
     for px,py in pts:
         draw.ellipse((px-3,py-3,px+3,py+3), fill=dot)
 
@@ -214,9 +228,10 @@ def draw_line(draw, box, values, color, dot):
 # 日付（JST）
 # --------------------------------------
 def draw_date(draw):
-    today = datetime.utcnow() + timedelta(hours=9)   # ★ GitHub Actions 対策
-    week = "月火水木金土日"[today.weekday()]
-    text = today.strftime("%Y/%m/%d") + f"（{week}）"
+    JST = datetime.utcnow() + timedelta(hours=9)
+    week = "月火水木金土日"[JST.weekday()]
+    text = JST.strftime("%Y/%m/%d") + f"（{week}）"
+
     font = ImageFont.truetype("noto-sans-jp/NotoSansJP-Regular.otf", 20)
 
     x,y,w,h = 1020, 15, 140, 20
@@ -225,7 +240,7 @@ def draw_date(draw):
 
 
 # ======================================
-# ★ 画像生成（完全スプラ方式）
+# ★ 画像生成（完全版）
 # ======================================
 def generate(output_path):
 
@@ -234,10 +249,11 @@ def generate(output_path):
     crypto = get_crypto_fgi()
     crypto_1y = get_crypto_one_year_ago()
 
+    # ---- スプレッドシート更新 ----
     append_stock_history(stock)
     append_last_7days_crypto(crypto["raw"])
 
-    # ---- 新規テンプレを毎回読み込む ----
+    # ---- テンプレ読み込み ----
     base = Image.open("template/FearGreedTemplate.png").convert("RGBA")
     draw = ImageDraw.Draw(base)
 
@@ -286,8 +302,12 @@ def generate(output_path):
 
     # ---- グラフ ----
     x,y,w,h = coords["graph"]
-    draw_line(draw, (x,y,w,h), get_last30_with_now("StockFear&Greed", stock["now"]), "#f2f2f2", "#ffffff")
-    draw_line(draw, (x,y,w,h), get_last30_with_now("CryptoGreedFear", crypto["now"]), "#f7921a", "#f7921a")
+    draw_line(draw, (x,y,w,h),
+              get_last30_with_now("StockFear&Greed", stock["now"]),
+              "#f2f2f2", "#ffffff")
+    draw_line(draw, (x,y,w,h),
+              get_last30_with_now("CryptoGreedFear", crypto["now"]),
+              "#f7921a", "#f7921a")
 
     # ---- 日付 ----
     draw_date(draw)
