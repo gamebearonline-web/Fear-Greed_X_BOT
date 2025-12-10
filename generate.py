@@ -1,3 +1,8 @@
+# ======================================
+#  Fear & Greed Index 画像生成（安定版）
+#  ※ RapidAPI 仕様変更対応 / 例外強化
+# ======================================
+
 from PIL import Image, ImageDraw, ImageFont
 import requests
 import os
@@ -6,9 +11,9 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
 import math
 
-# ============================================================
+# ======================================
 #  Google Sheets 認証
-# ============================================================
+# ======================================
 def get_sheet(sheet_name):
     SHEET_ID = "1YS3tyCuduXf9SDhbgEOv74f5RHSapa8kBw5y979EYO0"
 
@@ -24,10 +29,9 @@ def get_sheet(sheet_name):
     client = gspread.authorize(creds)
     return client.open_by_key(SHEET_ID).worksheet(sheet_name)
 
-
-# ============================================================
-#  Crypto：1年前データ取得
-# ============================================================
+# ======================================
+# Crypto：1年前データ取得
+# ======================================
 def get_crypto_one_year_ago():
     ws = get_sheet("CryptoGreedFear")
 
@@ -40,10 +44,9 @@ def get_crypto_one_year_ago():
             return int(r[1])
     return None
 
-
-# ============================================================
-#  RapidAPI：株式 Fear & Greed
-# ============================================================
+# ======================================
+# RapidAPI：株式 Fear & Greed（安全版）
+# ======================================
 def get_stock_fgi():
     url = "https://fear-and-greed-index.p.rapidapi.com/v1/fgi"
     headers = {
@@ -51,21 +54,33 @@ def get_stock_fgi():
         "x-rapidapi-host": "fear-and-greed-index.p.rapidapi.com",
     }
 
-    d = requests.get(url, headers=headers).json()["fgi"]
+    res = requests.get(url, headers=headers)
+    try:
+        data = res.json()
+    except Exception:
+        print("[ERROR] RapidAPI Decode:", res.text)
+        raise
+
+    # 旧仕様 or 新仕様
+    if "fgi" in data:
+        fgi = data["fgi"]
+    elif "data" in data:
+        fgi = data["data"]
+    else:
+        raise Exception(f"[ERROR] FGI 構造エラー: {data}")
 
     return {
-        "now": d["now"]["value"],
-        "1_day_ago": d["previousClose"]["value"],
-        "1_week_ago": d["oneWeekAgo"]["value"],
-        "1_month_ago": d["oneMonthAgo"]["value"],
-        "1_year_ago": d["oneYearAgo"]["value"],
-        "raw": d,
+        "now":          int(fgi["now"]["value"]),
+        "1_day_ago":    int(fgi["previousClose"]["value"]),
+        "1_week_ago":   int(fgi["oneWeekAgo"]["value"]),
+        "1_month_ago":  int(fgi["oneMonthAgo"]["value"]),
+        "1_year_ago":   int(fgi["oneYearAgo"]["value"]),
+        "raw": fgi,
     }
 
-
-# ============================================================
-#  Stock FGI（履歴追加）
-# ============================================================
+# ======================================
+# Stock FGI 履歴追加
+# ======================================
 def append_stock_history(stock):
     ws = get_sheet("StockFear&Greed")
 
@@ -85,10 +100,9 @@ def append_stock_history(stock):
         if date_str not in existing:
             ws.append_row([date_str, value])
 
-
-# ============================================================
-#  Crypto API（Alternative.me）
-# ============================================================
+# ======================================
+# Crypto API
+# ======================================
 def get_crypto_fgi():
     data = requests.get("https://api.alternative.me/fng/?limit=30").json()["data"]
 
@@ -100,10 +114,9 @@ def get_crypto_fgi():
         "raw": data,
     }
 
-
-# ============================================================
-#  Crypto 過去7日保存
-# ============================================================
+# ======================================
+# Crypto 過去7日履歴
+# ======================================
 def append_last_7days_crypto(raw):
     ws = get_sheet("CryptoGreedFear")
     existing = {r[0] for r in ws.get_all_values()[1:]}
@@ -114,10 +127,9 @@ def append_last_7days_crypto(raw):
         if date not in existing:
             ws.append_row([date, int(d["value"]), d["value_classification"]])
 
-
-# ============================================================
+# ======================================
 # グラフ用データ
-# ============================================================
+# ======================================
 def get_last30_with_now(sheet_name, now_value):
     ws = get_sheet(sheet_name)
     rows = ws.get_all_values()[1:]
@@ -126,10 +138,9 @@ def get_last30_with_now(sheet_name, now_value):
     vals.append(int(now_value))
     return vals
 
-
-# ============================================================
-# 色・ラベル
-# ============================================================
+# ======================================
+# 色
+# ======================================
 def value_to_color(value):
     if value <= 24:  return "#FD5763"
     elif value <= 44: return "#FC854E"
@@ -137,34 +148,30 @@ def value_to_color(value):
     elif value <= 75: return "#A1D778"
     return "#6BCA67"
 
-
 def value_to_label(value):
     if value <= 24:  return "Extreme Fear"
-    elif value <= 44: return "Fear"
-    elif value <= 55: return "Neutral"
-    elif value <= 75: return "Greed"
+    if value <= 44:  return "Fear"
+    if value <= 55:  return "Neutral"
+    if value <= 75:  return "Greed"
     return "Extreme Greed"
 
-
-# ============================================================
+# ======================================
 # 文字描画
-# ============================================================
+# ======================================
 def draw_text_center(draw, xywh, text, font, color):
     x, y, w, h = xywh
     tw, th = draw.textbbox((0, 0), text, font=font)[2:]
-    draw.text((x + (w - tw)/2, y + (h - th)/2), text, font=font, fill=color)
-
+    draw.text((x+(w-tw)/2, y+(h-th)/2), text, font=font, fill=color)
 
 def draw_label(draw, xywh, value, font):
     label = value_to_label(value)
-    x, y, w, h = xywh
-    tw, th = draw.textbbox((0, 0), label, font=font)[2:]
-    draw.text((x + (w - tw)/2, y + h ), label, font=font, fill=value_to_color(value))
+    x,y,w,h = xywh
+    tw, th = draw.textbbox((0,0), label, font=font)[2:]
+    draw.text((x+(w-tw)/2, y+h), label, font=font, fill=value_to_color(value))
 
-
-# ============================================================
+# ======================================
 # 針描画
-# ============================================================
+# ======================================
 def draw_needle(draw, center, value, length=200):
     if value <= 24:
         angle = 180 + (value / 24) * 35
@@ -178,53 +185,43 @@ def draw_needle(draw, center, value, length=200):
         angle = 324 + ((value - 76) / 24) * 36
 
     rad = math.radians(angle)
-    x0, y0 = center
+    x0,y0 = center
     x1 = x0 + length * math.cos(rad)
     y1 = y0 + length * math.sin(rad)
 
-    draw.line((x0, y0, x1, y1), fill="#444444", width=6)
+    draw.line((x0,y0,x1,y1), fill="#444444", width=6)
 
-
-# ============================================================
+# ======================================
 # 折れ線グラフ
-# ============================================================
+# ======================================
 def draw_line(draw, xywh, values, color, dot):
-    x, y, w, h = xywh
+    x,y,w,h = xywh
     pts = []
-    for i, v in enumerate(values):
-        px = x + (i/(len(values)-1)) * w
-        py = y + h - (v/100) * h
-        pts.append((px, py))
+    for i,v in enumerate(values):
+        px = x + (i/(len(values)-1))*w
+        py = y + h - (v/100)*h
+        pts.append((px,py))
 
     draw.line(pts, fill=color, width=3)
+    for px,py in pts:
+        draw.ellipse((px-3,py-3,px+3,py+3), fill=dot)
 
-    for px, py in pts:
-        draw.ellipse((px-3, py-3, px+3, py+3), fill=dot)
-
-
-# ============================================================
-# 右上：日付描画
-# ============================================================
+# ======================================
+# 日付描画
+# ======================================
 def draw_date(draw):
     today = datetime.now()
-    week_jp = ["月", "火", "水", "木", "金", "土", "日"]
+    week_jp = ["月","火","水","木","金","土","日"]
     date_text = today.strftime("%Y/%m/%d") + f"（{week_jp[today.weekday()]}）"
-
     font_date = ImageFont.truetype("noto-sans-jp/NotoSansJP-Regular.otf", 20)
 
-    x, y, w, h = 1020, 15, 140, 20
-    tw, th = draw.textbbox((0, 0), date_text, font=font_date)[2:]
-    draw.text(
-        (x + (w - tw)/2, y + (h - th)/2),
-        date_text,
-        font=font_date,
-        fill="#4D4D4D"
-    )
+    x,y,w,h = 1020, 15, 140, 20
+    tw, th = draw.textbbox((0,0), date_text, font=font_date)[2:]
+    draw.text((x+(w-tw)/2, y+(h-th)/2), date_text, font=font_date, fill="#4D4D4D")
 
-
-# ============================================================
-# 🚀 メイン処理（画像生成のみ）
-# ============================================================
+# ======================================
+# 画像生成メイン
+# ======================================
 def generate_image():
 
     stock = get_stock_fgi()
@@ -276,12 +273,12 @@ def generate_image():
     draw_needle(draw, (320, 324), stock["now"])
     draw_needle(draw, (880, 324), crypto["now"])
 
-    # 中央の大きな番号
+    # 中央数値
     draw_text_center(draw, coords["stock"]["previous"], str(stock["now"]), font_big, value_to_color(stock["now"]))
     draw_text_center(draw, coords["crypto"]["previous"], str(crypto["now"]), font_big, value_to_color(crypto["now"]))
 
     # グラフ
-    gx, gy, gw, gh = coords["graph"]
+    gx,gy,gw,gh = coords["graph"]
     draw_line(draw, (gx,gy,gw,gh), get_last30_with_now("StockFear&Greed", stock["now"]), "#f2f2f2", "#ffffff")
     draw_line(draw, (gx,gy,gw,gh), get_last30_with_now("CryptoGreedFear", crypto["now"]), "#f7921a", "#f7921a")
 
@@ -296,6 +293,8 @@ def generate_image():
 
     return path
 
-
+# ======================================
+# MAIN
+# ======================================
 if __name__ == "__main__":
     generate_image()
