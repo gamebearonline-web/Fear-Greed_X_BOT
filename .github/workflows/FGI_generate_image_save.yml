@@ -7,7 +7,7 @@ permissions:
   contents: write
 
 jobs:
-  save-latest:
+  save-and-artifact:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,23 +20,16 @@ jobs:
         with:
           python-version: "3.11"
 
-      # ===============================
-      # 📦 Install dependencies
-      # ===============================
       - name: Install deps
         run: pip install -r requirements.txt
 
-      # ===============================
-      # 🔐 service-account.json（Google Sheets）
-      # ===============================
+      # 🔐 service-account.json 復元
       - name: Restore service-account.json
         run: |
           echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
           chmod 600 service-account.json
 
-      # ===============================
-      # 🎨 Fear & Greed Image Generate
-      # ===============================
+      # 🔥 Fear Greed 画像生成
       - name: Run generator
         env:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
@@ -44,20 +37,18 @@ jobs:
           mkdir -p output
           python generate.py --output output/FearGreed_Output.png
 
-      # ===============================
-      # 🔍 Debug：出力確認（重要）
-      # ===============================
-      - name: Check generated files
-        run: |
-          echo "=== Current directory ==="
-          ls -R .
+      # 📤 投稿用 PNG を artifact としてアップロード
+      - name: Upload PNG Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FGI_Image
+          path: output/FearGreed_Output.png
+          retention-days: 1
 
-      # ===============================
-      # 💾 Save PNG to repo
-      # ===============================
+      # 📌 GitHub 確認用 PNG を保存 (LatestPNG に)
       - name: Commit & Push latest PNG
         run: |
-          git config user.name "github-actions[bot]"
+          git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           mkdir -p LatestPNG
