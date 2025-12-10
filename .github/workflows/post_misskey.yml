@@ -2,7 +2,7 @@ name: FearGreedBot - Post to Misskey
 
 on:
   workflow_run:
-    workflows: ["FearGreedBot - Post to Bluesky"]   # ← 修正ポイント
+    workflows: ["FearGreedBot - Post to Bluesky"]   # ← Bluesky 成功後に起動
     types: [completed]
 
 permissions:
@@ -21,17 +21,18 @@ jobs:
           python-version: "3.11"
 
       - name: Install deps
-        run: pip install -r requirements.txt requests
+        run: |
+          pip install -r requirements.txt
+          pip install requests
 
       - name: Check image
         run: |
-         test -f output/FearGreed_Output.png
-
+          test -f output/FearGreed_Output.png
 
       - name: Post to Misskey
         env:
           MISSKEY_HOST:   ${{ secrets.MISSKEY_HOST }}
           MISSKEY_TOKEN:  ${{ secrets.MISSKEY_TOKEN }}
           IMAGE_PATH:     output/FearGreed_Output.png
-          POST_TEXT_PATH: post_text.txt
+          RAPIDAPI_KEY:   ${{ secrets.RAPIDAPI_KEY }}    # ← ★ 必須 ★
         run: python post_misskey.py
