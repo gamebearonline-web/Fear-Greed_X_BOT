@@ -1,6 +1,6 @@
 # ======================================
 #  Fear & Greed Index 画像生成（安定版）
-#  ※ RapidAPI 仕様変更対応 / 例外強化
+#  RapidAPI / Google Sheets / 出力オプション対応
 # ======================================
 
 from PIL import Image, ImageDraw, ImageFont
@@ -10,6 +10,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
 import math
+import argparse
 
 # ======================================
 #  Google Sheets 認証
@@ -101,7 +102,7 @@ def append_stock_history(stock):
             ws.append_row([date_str, value])
 
 # ======================================
-# Crypto API
+# Crypto Fear & Greed API
 # ======================================
 def get_crypto_fgi():
     data = requests.get("https://api.alternative.me/fng/?limit=30").json()["data"]
@@ -139,7 +140,7 @@ def get_last30_with_now(sheet_name, now_value):
     return vals
 
 # ======================================
-# 色
+# 色設定
 # ======================================
 def value_to_color(value):
     if value <= 24:  return "#FD5763"
@@ -222,7 +223,7 @@ def draw_date(draw):
 # ======================================
 # 画像生成メイン
 # ======================================
-def generate_image():
+def generate_image(output_path="/tmp/FearGreed_Output.png"):
 
     stock = get_stock_fgi()
     crypto = get_crypto_fgi()
@@ -285,16 +286,24 @@ def generate_image():
     # 日付
     draw_date(draw)
 
-    # 保存
-    os.makedirs("output", exist_ok=True)
-    path = "output/FearGreed_Output.png"
-    img.save(path)
-    print("[SAVED]", path)
+    # ======================================
+    #  保存処理（output_path に保存）
+    # ======================================
+    out_dir = os.path.dirname(output_path)
+    if out_dir and not os.path.exists(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
 
-    return path
+    img.save(output_path)
+    print("[SAVED]", output_path)
+    return output_path
+
 
 # ======================================
-# MAIN
+# MAIN：--output で保存先を指定可能
 # ======================================
 if __name__ == "__main__":
-    generate_image()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", default="/tmp/FearGreed_Output.png")
+    args = parser.parse_args()
+
+    generate_image(output_path=args.output)
