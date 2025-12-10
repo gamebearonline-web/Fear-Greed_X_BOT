@@ -47,7 +47,7 @@ def get_sheet(sheet_name):
 # ======================================
 def get_crypto_one_year_ago():
     ws = get_sheet("CryptoGreedFear")
-    target = (datetime.now() - timedelta(days=365)).strftime("%Y/%m/%d")
+    target = (datetime.utcnow() + timedelta(hours=9) - timedelta(days=365)).strftime("%Y/%m/%d")
 
     for r in ws.get_all_values()[1:]:
         if r[0] == target:
@@ -86,7 +86,7 @@ def get_stock_fgi():
 def append_stock_history(stock):
     ws = get_sheet("StockFear&Greed")
     exist = {r[0] for r in ws.get_all_values()[1:]}
-    today = datetime.now()
+    today = datetime.utcnow() + timedelta(hours=9)
 
     points = [
         (today,                     stock["now"]),
@@ -124,7 +124,7 @@ def append_last_7days_crypto(raw):
     exist = {r[0] for r in ws.get_all_values()[1:]}
 
     for d in reversed(raw[:7]):
-        dt = datetime.fromtimestamp(int(d["timestamp"]))
+        dt = datetime.fromtimestamp(int(d["timestamp"])) + timedelta(hours=9)  # JST
         date = dt.strftime("%Y/%m/%d")
         if date not in exist:
             ws.append_row([date, int(d["value"]), d["value_classification"]])
@@ -211,10 +211,10 @@ def draw_line(draw, box, values, color, dot):
 
 
 # --------------------------------------
-# 日付
+# 日付（JST）
 # --------------------------------------
 def draw_date(draw):
-    today = datetime.now()
+    today = datetime.utcnow() + timedelta(hours=9)   # ★ GitHub Actions 対策
     week = "月火水木金土日"[today.weekday()]
     text = today.strftime("%Y/%m/%d") + f"（{week}）"
     font = ImageFont.truetype("noto-sans-jp/NotoSansJP-Regular.otf", 20)
@@ -225,7 +225,7 @@ def draw_date(draw):
 
 
 # ======================================
-# ★ 画像生成（スプラ式）
+# ★ 画像生成（完全スプラ方式）
 # ======================================
 def generate(output_path):
 
@@ -237,11 +237,11 @@ def generate(output_path):
     append_stock_history(stock)
     append_last_7days_crypto(crypto["raw"])
 
-    # ---- テンプレート読込（毎回新規 → 古い内容が残らない） ----
+    # ---- 新規テンプレを毎回読み込む ----
     base = Image.open("template/FearGreedTemplate.png").convert("RGBA")
     draw = ImageDraw.Draw(base)
 
-    # ---- フォント読込 ----
+    # ---- フォント ----
     font = ImageFont.truetype("noto-sans-jp/NotoSansJP-Bold.otf", 40)
     font_big = ImageFont.truetype("noto-sans-jp/NotoSansJP-Bold.otf", 70)
     font_small = ImageFont.truetype("noto-sans-jp/NotoSansJP-Regular.otf", 16)
@@ -272,7 +272,7 @@ def generate(output_path):
 
     # ---- Crypto ----
     for k in ["1_day_ago","1_week_ago","1_month_ago","1_year_ago"]:
-        v = crypto_1y if k == "1_year_ago" else crypto[k]
+        v = crypto_1y if k=="1_year_ago" else crypto[k]
         draw_text_center(draw, coords["crypto"][k], str(v), font, value_to_color(v))
         draw_label(draw, coords["crypto"][k], v, font_small)
 
@@ -299,7 +299,7 @@ def generate(output_path):
 
 
 # ======================================
-# MAIN（スプラ方式）
+# MAIN
 # ======================================
 if __name__ == "__main__":
     args = parse_args()
