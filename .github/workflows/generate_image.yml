@@ -1,7 +1,7 @@
 name: generate_image
 
 on:
-  workflow_dispatch:   # ← GAS から手動で呼ぶだけにする
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -34,6 +34,29 @@ jobs:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
         run: python generate.py
 
+
+      #  ⭐ 今日の日付を保存して、前回と違えば必ず更新対象にする
+      - name: Check date change
+        id: datecheck
+        run: |
+          TODAY=$(date +"%Y/%m/%d")
+          echo "today=$TODAY" >> $GITHUB_OUTPUT
+
+          if [ -f last_date.txt ]; then
+            LAST=$(cat last_date.txt)
+          else
+            LAST="none"
+          fi
+
+          echo "last=$LAST" >> $GITHUB_OUTPUT
+
+          if [ "$TODAY" != "$LAST" ]; then
+            echo "date_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "date_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+
       - name: Commit & Push updated PNG and post_text
         run: |
           git config user.name "github-actions"
@@ -41,12 +64,27 @@ jobs:
 
           git pull origin main --rebase || true
 
-          git add output/FearGreed_Output.png || true
-          git add post_text.txt || true
+          # ⭐ 常に生成されたファイルを add
+          git add output/FearGreed_Output.png
+          git add post_text.txt
+          git add last_date.txt || true
 
+          # ⭐ 今日の日付で上書き
+          echo "${{ steps.datecheck.outputs.today }}" > last_date.txt
+          git add last_date.txt
+
+          # ⭐ 日付が変わった日は必ず commit
+          if [ "${{ steps.datecheck.outputs.date_changed }}" = "true" ]; then
+            echo "📅 日付が変わったため必ず commit します"
+            git commit -m "Daily update (date changed)" || true
+            git push
+            exit 0
+          fi
+
+          # ⭐ 数値変化が無い場合だけ commit をスキップ
           if ! git diff --cached --quiet; then
             git commit -m "Update FearGreed output (auto)"
             git push
           else
-            echo "No changes to commit"
+            echo "No numeric changes → Skip"
           fi
