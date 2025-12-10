@@ -1,5 +1,5 @@
 # ==========================================
-# post_bluesky.py（独立生成・完全修正版）
+# post_bluesky.py（FGI / Bluesky投稿・完全安定版）
 # ==========================================
 import os
 import requests
@@ -8,24 +8,30 @@ from atproto import Client
 from atproto.exceptions import AtProtocolError
 
 # -------------------------------
-# 🔐 環境変数
+# 🔐 環境変数チェック（スプラ方式）
 # -------------------------------
 BSKY_HANDLE = os.getenv("BSKY_HANDLE")
 BSKY_APP_PASSWORD = os.getenv("BSKY_APP_PASSWORD")
 IMAGE_PATH = os.getenv("IMAGE_PATH")
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
 
+if not BSKY_HANDLE or not BSKY_APP_PASSWORD:
+    raise Exception("[ERROR] Bluesky の環境変数（BSKY_HANDLE / BSKY_APP_PASSWORD）が不足しています")
 
-# ==========================================
-# 共通ロジック
-# ==========================================
+if not RAPIDAPI_KEY:
+    raise Exception("[ERROR] RAPIDAPI_KEY が未設定です（必須）")
 
+# --------------------------------------------------------
+#  日付処理（日本時間）
+# --------------------------------------------------------
 def get_today_text():
     now = datetime.utcnow() + timedelta(hours=9)
     weekday = ["月", "火", "水", "木", "金", "土", "日"][now.weekday()]
     return f"{now.strftime('%Y/%m/%d')}（{weekday}）"
 
-
+# --------------------------------------------------------
+#  FGI 共通ラベル
+# --------------------------------------------------------
 def value_to_label(v):
     if v <= 24: return "Extreme Fear"
     if v <= 44: return "Fear"
@@ -33,12 +39,10 @@ def value_to_label(v):
     if v <= 75: return "Greed"
     return "Extreme Greed"
 
-
-# ==========================================
-# 🔥 Stock FGI（RapidAPI）安全版
-# ==========================================
+# --------------------------------------------------------
+#  Stock FGI（RapidAPI）
+# --------------------------------------------------------
 def get_stock_fgi_with_prev():
-
     url = "https://fear-and-greed-index.p.rapidapi.com/v1/fgi"
     headers = {
         "x-rapidapi-key": RAPIDAPI_KEY,
@@ -46,118 +50,113 @@ def get_stock_fgi_with_prev():
     }
 
     res = requests.get(url, headers=headers)
-
     try:
         data = res.json()
     except Exception as e:
-        print("[ERROR] RapidAPI JSON decode error:", e)
-        print("[ERROR] Response text:", res.text)
-        raise Exception("RapidAPI が JSON を返していません")
+        print("[ERROR] RapidAPI JSON Decode Error:", e)
+        print("[ERROR] Response:", res.text)
+        raise
 
-    print("[DEBUG] RapidAPI response:", data)
+    print("[DEBUG] RapidAPI Response:", data)
 
-    # --- 柔軟: fgi が無ければ data の下を探索 --------------------
     if "fgi" in data:
         fgi = data["fgi"]
     elif "data" in data:
-        # 新仕様の可能性
         fgi = data["data"]
     else:
-        raise Exception(f"[ERROR] レスポンスに fgi がありません → {data}")
+        raise Exception(f"[ERROR] FGI データが見つかりません → {data}")
 
     try:
         now = int(fgi["now"]["value"])
         prev = int(fgi["previousClose"]["value"])
     except Exception as e:
-        print("[ERROR] FGI構造が想定外:", fgi)
+        print("[ERROR] FGI 構造違い:", fgi)
         raise e
 
-    label = value_to_label(now)
-    return now, prev, label
+    return now, prev, value_to_label(now)
 
-
-# ==========================================
-# Crypto Fear & Greed（alternative.me）
-# ==========================================
+# --------------------------------------------------------
+#  Crypto FGI（alternative.me）
+# --------------------------------------------------------
 def get_crypto_fgi_with_prev():
     url = "https://api.alternative.me/fng/?limit=2"
-
-    res = requests.get(url)
-    data = res.json()
+    data = requests.get(url).json()
 
     try:
-        values = data["data"]
-        now = int(values[0]["value"])
-        prev = int(values[1]["value"])
+        now = int(data["data"][0]["value"])
+        prev = int(data["data"][1]["value"])
     except Exception as e:
-        print("[ERROR] Crypto API 構造エラー:", data)
+        print("[ERROR] Crypto FGI API構造:", data)
         raise e
 
-    label = value_to_label(now)
-    return now, prev, label
+    return now, prev, value_to_label(now)
 
-
+# --------------------------------------------------------
+#  差分表記
+# --------------------------------------------------------
 def diff(now, prev):
     d = now - prev
-    if d > 0:  return f"(+{d})"
-    if d < 0:  return f"({d})"
+    if d > 0: return f"(+{d})"
+    if d < 0: return f"({d})"
     return "(±0)"
 
-
-# ==========================================
-# Bluesky 投稿文生成
-# ==========================================
+# --------------------------------------------------------
+#  投稿文作成
+# --------------------------------------------------------
 def build_post_text():
     today = get_today_text()
 
     stock_now, stock_prev, stock_label = get_stock_fgi_with_prev()
     crypto_now, crypto_prev, crypto_label = get_crypto_fgi_with_prev()
 
-    stock_diff = diff(stock_now, stock_prev)
-    crypto_diff = diff(crypto_now, crypto_prev)
-
     return (
         "CNN・Crypto Fear & Greed Index（恐怖と欲望指数）\n"
         f"{today}\n\n"
-        f"⬜Stock：{stock_now}{stock_diff}【{stock_label}】\n"
-        f"🟧Bitcoin：{crypto_now}{crypto_diff}【{crypto_label}】"
+        f"⬜Stock：{stock_now}{diff(stock_now, stock_prev)}【{stock_label}】\n"
+        f"🟧Bitcoin：{crypto_now}{diff(crypto_now, crypto_prev)}【{crypto_label}】"
     )
 
-
-# ==========================================
-# Bluesky 投稿処理
-# ==========================================
+# --------------------------------------------------------
+#  Bluesky 投稿処理
+# --------------------------------------------------------
 def main():
-    print("[INFO] post_bluesky.py started")
+    print("[INFO] Starting Bluesky posting...")
 
     if not IMAGE_PATH or not os.path.exists(IMAGE_PATH):
         raise Exception(f"[ERROR] 画像が存在しません → {IMAGE_PATH}")
 
     # 投稿文生成
     text = build_post_text()
-    print("\n--- POST TEXT (Bluesky) ---\n" + text + "\n")
+    print("\n----- POST TEXT (Bluesky) -----\n" + text + "\n")
 
-    # Bluesky Login
+    # ログイン
     client = Client()
     try:
         client.login(BSKY_HANDLE, BSKY_APP_PASSWORD)
+        print("[INFO] Bluesky Login OK")
     except AtProtocolError as e:
-        raise Exception(f"[ERROR] Bluesky ログイン失敗 → {e}")
+        raise Exception(f"[ERROR] Bluesky Login Failed → {e}")
 
-    # 画像アップロード
+    # 画像ロード
     with open(IMAGE_PATH, "rb") as f:
         img_bytes = f.read()
 
-    blob = client.upload_blob(img_bytes)
+    # 画像アップロード（contentType を明示）
+    try:
+        blob = client.upload_blob(img_bytes, encoding="image/png")
+    except Exception as e:
+        raise Exception(f"[ERROR] 画像アップロード失敗 → {e}")
+
+    # 投稿準備
     embed = client.get_embed_image(blob, "Fear & Greed Index")
 
-    # 投稿
+    # 投稿実行
     try:
         client.create_post(text=text, embed=embed)
-    except AtProtocolError as e:
+    except Exception as e:
         raise Exception(f"[ERROR] Bluesky 投稿失敗 → {e}")
 
-    print("[OK] Posted to Bluesky successfully!")
+    print("[SUCCESS] 投稿完了（Bluesky）")
 
 
 if __name__ == "__main__":
