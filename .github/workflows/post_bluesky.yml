@@ -34,4 +34,5 @@ jobs:
           BSKY_HANDLE:       ${{ secrets.BSKY_HANDLE }}
           BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
           IMAGE_PATH:        output/FearGreed_Output.png
+          RAPIDAPI_KEY:      ${{ secrets.RAPIDAPI_KEY }}     # ←★★★ これが必要
         run: python post_bluesky.py
