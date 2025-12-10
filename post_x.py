@@ -1,11 +1,11 @@
 # ==========================================
-# post_x.py（tweepy V1 画像 + V2 投稿 / 完全版）
+# post_x.py（tweepy V1 画像 + V2 投稿 / 改良版）
 # ==========================================
 import os
 import sys
 import tweepy
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
 
 # ======================================================
@@ -18,6 +18,11 @@ ACCESS_SECRET = os.getenv("TWITTER_ACCESS_SECRET")
 
 IMAGE_PATH = os.getenv("IMAGE_PATH")
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
+
+# ---- 追加（必須チェック） ----
+if not RAPIDAPI_KEY:
+    print("[ERROR] RAPIDAPI_KEY が設定されていません")
+    sys.exit(1)
 
 if not all([API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET]):
     print("[ERROR] Twitter API credentials が不足しています")
@@ -33,15 +38,9 @@ def value_to_label(v):
     if v <= 75:  return "Greed"
     return "Extreme Greed"
 
-
 def diff(now, prev):
     d = now - prev
-    if d > 0:
-        return f"(+{d})"
-    if d < 0:
-        return f"({d})"
-    return "(±0)"
-
+    return f"(+{d})" if d > 0 else f"({d})" if d < 0 else "(±0)"
 
 def get_stock_fgi():
     url = "https://fear-and-greed-index.p.rapidapi.com/v1/fgi"
@@ -56,7 +55,6 @@ def get_stock_fgi():
     prev = int(fgi["previousClose"]["value"])
     return now, prev, value_to_label(now)
 
-
 def get_crypto_fgi():
     url = "https://api.alternative.me/fng/?limit=2"
     d = requests.get(url).json()["data"]
@@ -70,8 +68,7 @@ def get_crypto_fgi():
 # ======================================================
 def build_post_text():
     jst = pytz.timezone("Asia/Tokyo")
-    now = datetime.now(jst)
-    today = now.strftime("%Y/%m/%d（%a）")
+    today = datetime.now(jst).strftime("%Y/%m/%d（%a）")
 
     stock_now, stock_prev, stock_label = get_stock_fgi()
     crypto_now, crypto_prev, crypto_label = get_crypto_fgi()
@@ -87,24 +84,24 @@ def build_post_text():
 #   X 投稿処理
 # ======================================================
 def upload_media_v1(image_path):
-    """画像を V1 API でアップロード"""
+    if not os.path.exists(image_path):
+        print("[ERROR] 画像が見つかりません →", image_path)
+        sys.exit(1)
+
     try:
         auth = tweepy.OAuth1UserHandler(
-            API_KEY, API_SECRET,
-            ACCESS_TOKEN, ACCESS_SECRET
+            API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET
         )
         api = tweepy.API(auth)
         media = api.media_upload(filename=image_path)
-        media_id = str(media.media_id)
-        print(f"[INFO] Media uploaded → media_id={media_id}")
-        return media_id
+        print(f"[INFO] Media uploaded → media_id={media.media_id}")
+        return str(media.media_id)
+
     except Exception as e:
         print("[ERROR] 画像アップロード失敗:", repr(e))
         sys.exit(1)
 
-
 def post_tweet_v2(text, media_id):
-    """V2 API でツイート投稿"""
     try:
         client = tweepy.Client(
             consumer_key=API_KEY,
@@ -120,10 +117,9 @@ def post_tweet_v2(text, media_id):
 
         tweet_id = response.data["id"]
 
-        # ユーザー名取得（安全に）
+        # 投稿者名（任意）
         try:
-            user_info = client.get_me()
-            username = user_info.data.username if user_info.data else "unknown"
+            username = client.get_me().data.username
         except:
             username = "unknown"
 
@@ -140,10 +136,6 @@ def post_tweet_v2(text, media_id):
 def main():
     print("[INFO] post_x.py started")
 
-    if not IMAGE_PATH or not os.path.exists(IMAGE_PATH):
-        print(f"[ERROR] 画像が見つかりません → {IMAGE_PATH}")
-        sys.exit(1)
-
     # 投稿文生成
     text = build_post_text()
 
@@ -154,7 +146,6 @@ def main():
     post_tweet_v2(text, media_id)
 
     print("[DONE] X 投稿完了")
-
 
 if __name__ == "__main__":
     main()
