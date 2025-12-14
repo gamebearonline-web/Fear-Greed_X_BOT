@@ -2,8 +2,10 @@ name: FGI - Post to Misskey
 
 on:
   workflow_run:
-    workflows: ["FGI - Post to Bluesky"]
-    types: [completed]
+    workflows:
+      - FGI_generate_image_save   # ★ 生成workflowの name と完全一致
+    types:
+      - completed
 
 permissions:
   contents: read
@@ -15,21 +17,42 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # --------------------------
+      # ① リポジトリ取得
+      # --------------------------
       - uses: actions/checkout@v4
 
+      # --------------------------
+      # ② Python セットアップ
+      # --------------------------
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - run: pip install -r requirements.txt
-      - run: pip install requests
+      - name: Install deps
+        run: |
+          pip install -r requirements.txt
+          pip install requests pytz
 
-      - name: Download artifact
+      # --------------------------
+      # ③ artifact を取得（run-id 指定）
+      # --------------------------
+      - name: Download FGI image artifact
         uses: actions/download-artifact@v4
         with:
-          name: fgi-image
+          name: FGI_Image                         # ★ 完全一致
           path: fgi-image
+          run-id: ${{ github.event.workflow_run.id }}
+          repository: ${{ github.repository }}
 
+      - name: Show downloaded files
+        run: |
+          echo "=== Show artifact directory ==="
+          ls -la fgi-image/
+
+      # --------------------------
+      # ④ Misskey 投稿
+      # --------------------------
       - name: Post to Misskey
         env:
           MISSKEY_HOST:  ${{ secrets.MISSKEY_HOST }}
