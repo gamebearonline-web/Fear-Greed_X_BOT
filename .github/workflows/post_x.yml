@@ -2,8 +2,10 @@ name: FGI - Post to X
 
 on:
   workflow_run:
-    workflows: ["FGI - Generate Image"]   # ← ここを必ず生成ワークフロー名と一致させる
-    types: [completed]
+    workflows:
+      - FGI_generate_image_save   # ★ 生成workflowの name と完全一致
+    types:
+      - completed
 
 permissions:
   contents: read
@@ -15,8 +17,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # --------------------------
+      # ① リポジトリ取得
+      # --------------------------
       - uses: actions/checkout@v4
 
+      # --------------------------
+      # ② Python セットアップ
+      # --------------------------
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -26,29 +34,31 @@ jobs:
           pip install -r requirements.txt
           pip install tweepy pytz
 
-      # ==========================
-      # ★ artifact をダウンロード
-      # ==========================
+      # --------------------------
+      # ③ artifact を取得（run-id 指定）
+      # --------------------------
       - name: Download FGI image artifact
         uses: actions/download-artifact@v4
         with:
-          name: fgi-image
+          name: FGI_Image                         # ★ upload-artifact と一致
           path: fgi-image
+          run-id: ${{ github.event.workflow_run.id }}
+          repository: ${{ github.repository }}
 
       - name: Show downloaded files
         run: |
           echo "=== Show artifact directory ==="
           ls -la fgi-image/
 
-      # ==========================
-      # ★ X (Twitter) 投稿
-      # ==========================
+      # --------------------------
+      # ④ X (Twitter) 投稿
+      # --------------------------
       - name: Post to X
         env:
           TWITTER_API_KEY:        ${{ secrets.TWITTER_API_KEY }}
           TWITTER_API_SECRET:     ${{ secrets.TWITTER_API_SECRET }}
           TWITTER_ACCESS_TOKEN:   ${{ secrets.TWITTER_ACCESS_TOKEN }}
           TWITTER_ACCESS_SECRET:  ${{ secrets.TWITTER_ACCESS_SECRET }}
-          IMAGE_PATH:             fgi-image/FearGreed_Output.png   # ← artifact を参照
+          IMAGE_PATH:             fgi-image/FearGreed_Output.png
           RAPIDAPI_KEY:           ${{ secrets.RAPIDAPI_KEY }}
         run: python post_x.py
