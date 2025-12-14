@@ -43,9 +43,9 @@ jobs:
           chmod 600 service-account.json
 
       # ====================================
-      # ⑤ 画像生成（唯一の生成ポイント）
+      # ⑤ 画像 & 投稿文生成（唯一の生成ポイント）
       # ====================================
-      - name: Generate Fear & Greed image
+      - name: Generate Fear & Greed image and post text
         env:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
         run: |
@@ -54,30 +54,33 @@ jobs:
           ls -la output
 
       # ====================================
-      # ⑥ artifact アップロード
+      # ⑥ artifact アップロード（画像＋投稿文）
       # ====================================
-      - name: Upload image artifact
+      - name: Upload FGI artifact
         uses: actions/upload-artifact@v4
         with:
           name: fgi-image
-          path: output/FearGreed_Output.png
+          path: |
+            output/FearGreed_Output.png
+            output/post_text.txt
           retention-days: 1
 
       # ====================================
       # ⑦ artifact ダウンロード（投稿用）
       # ====================================
-      - name: Download image artifact
+      - name: Download FGI artifact
         uses: actions/download-artifact@v4
         with:
           name: fgi-image
           path: fgi-image
 
       # ====================================
-      # ⑧ X 投稿（API 呼ばない）
+      # ⑧ X 投稿（生成処理なし）
       # ====================================
       - name: Post to X
         env:
-          IMAGE_PATH: fgi-image/FearGreed_Output.png
+          IMAGE_PATH:      fgi-image/FearGreed_Output.png
+          POST_TEXT_PATH: fgi-image/post_text.txt
           TWITTER_API_KEY:        ${{ secrets.TWITTER_API_KEY }}
           TWITTER_API_SECRET:     ${{ secrets.TWITTER_API_SECRET }}
           TWITTER_ACCESS_TOKEN:   ${{ secrets.TWITTER_ACCESS_TOKEN }}
@@ -85,21 +88,23 @@ jobs:
         run: python post_x.py
 
       # ====================================
-      # ⑨ Bluesky 投稿（固定文）
+      # ⑨ Bluesky 投稿（生成処理なし）
       # ====================================
       - name: Post to Bluesky
         env:
-          IMAGE_PATH:        fgi-image/FearGreed_Output.png
+          IMAGE_PATH:      fgi-image/FearGreed_Output.png
+          POST_TEXT_PATH: fgi-image/post_text.txt
           BSKY_HANDLE:       ${{ secrets.BSKY_HANDLE }}
           BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
         run: python post_bluesky.py
 
       # ====================================
-      # ⑩ Misskey 投稿（API 呼ばない）
+      # ⑩ Misskey 投稿（生成処理なし）
       # ====================================
       - name: Post to Misskey
         env:
-          IMAGE_PATH:    fgi-image/FearGreed_Output.png
+          IMAGE_PATH:      fgi-image/FearGreed_Output.png
+          POST_TEXT_PATH: fgi-image/post_text.txt
           MISSKEY_HOST:  ${{ secrets.MISSKEY_HOST }}
           MISSKEY_TOKEN: ${{ secrets.MISSKEY_TOKEN }}
         run: python post_misskey.py
