@@ -1,30 +1,18 @@
 name: FGI - Post to X
 
 on:
-  workflow_run:
-    workflows:
-      - FGI_generate_image_save   # ★ 生成workflowの name と完全一致
-    types:
-      - completed
+  workflow_dispatch:
 
 permissions:
   contents: read
-  actions: read
 
 jobs:
   post-x:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
-      # --------------------------
-      # ① リポジトリ取得
-      # --------------------------
       - uses: actions/checkout@v4
 
-      # --------------------------
-      # ② Python セットアップ
-      # --------------------------
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -34,31 +22,41 @@ jobs:
           pip install -r requirements.txt
           pip install tweepy pytz
 
-      # --------------------------
-      # ③ artifact を取得（run-id 指定）
-      # --------------------------
-      - name: Download FGI image artifact
+      # ======================
+      # ★ 投稿用画像生成
+      # ======================
+      - name: Generate image for POST
+        env:
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+        run: |
+          python generate.py --output /tmp/FearGreed_Output.png
+
+      # ======================
+      # ★ artifact アップロード
+      # ======================
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-image
+          path: /tmp/FearGreed_Output.png
+
+      # ======================
+      # ★ artifact ダウンロード
+      # ======================
+      - name: Download image artifact
         uses: actions/download-artifact@v4
         with:
-          name: FGI_Image                         # ★ upload-artifact と一致
-          path: fgi-image
-          run-id: ${{ github.event.workflow_run.id }}
-          repository: ${{ github.repository }}
+          name: post-image
+          path: post-image
 
-      - name: Show downloaded files
-        run: |
-          echo "=== Show artifact directory ==="
-          ls -la fgi-image/
-
-      # --------------------------
-      # ④ X (Twitter) 投稿
-      # --------------------------
+      # ======================
+      # ★ X 投稿
+      # ======================
       - name: Post to X
         env:
           TWITTER_API_KEY:        ${{ secrets.TWITTER_API_KEY }}
           TWITTER_API_SECRET:     ${{ secrets.TWITTER_API_SECRET }}
           TWITTER_ACCESS_TOKEN:   ${{ secrets.TWITTER_ACCESS_TOKEN }}
           TWITTER_ACCESS_SECRET:  ${{ secrets.TWITTER_ACCESS_SECRET }}
-          IMAGE_PATH:             fgi-image/FearGreed_Output.png
-          RAPIDAPI_KEY:           ${{ secrets.RAPIDAPI_KEY }}
+          IMAGE_PATH:             post-image/FearGreed_Output.png
         run: python post_x.py
