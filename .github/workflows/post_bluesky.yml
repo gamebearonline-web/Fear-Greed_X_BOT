@@ -5,6 +5,10 @@ on:
     workflows: ["generate_image_save_only"]
     types: [completed]
 
+on:
+  workflow_dispatch:   # ★ 追加
+
+
 permissions:
   contents: read
   actions: read
