@@ -1,0 +1,105 @@
+name: FGI - Generate & Post All
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fgi-post-all:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # ====================================
+      # ① リポジトリ取得
+      # ====================================
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ====================================
+      # ② Python セットアップ
+      # ====================================
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ====================================
+      # ③ 依存関係インストール
+      # ====================================
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install tweepy atproto pytz requests
+
+      # ====================================
+      # ④ Google service-account 復元
+      # ====================================
+      - name: Restore Google service account key
+        run: |
+          echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
+          chmod 600 service-account.json
+
+      # ====================================
+      # ⑤ 画像生成（唯一の生成ポイント）
+      # ====================================
+      - name: Generate Fear & Greed image
+        env:
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+        run: |
+          mkdir -p output
+          python generate.py --output output/FearGreed_Output.png
+          ls -la output
+
+      # ====================================
+      # ⑥ artifact アップロード
+      # ====================================
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fgi-image
+          path: output/FearGreed_Output.png
+          retention-days: 1
+
+      # ====================================
+      # ⑦ artifact ダウンロード（投稿用）
+      # ====================================
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: fgi-image
+          path: fgi-image
+
+      # ====================================
+      # ⑧ X 投稿（API 呼ばない）
+      # ====================================
+      - name: Post to X
+        env:
+          IMAGE_PATH: fgi-image/FearGreed_Output.png
+          TWITTER_API_KEY:        ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET:     ${{ secrets.TWITTER_API_SECRET }}
+          TWITTER_ACCESS_TOKEN:   ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_SECRET:  ${{ secrets.TWITTER_ACCESS_SECRET }}
+        run: python post_x.py
+
+      # ====================================
+      # ⑨ Bluesky 投稿（固定文）
+      # ====================================
+      - name: Post to Bluesky
+        env:
+          IMAGE_PATH:        fgi-image/FearGreed_Output.png
+          BSKY_HANDLE:       ${{ secrets.BSKY_HANDLE }}
+          BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
+        run: python post_bluesky.py
+
+      # ====================================
+      # ⑩ Misskey 投稿（API 呼ばない）
+      # ====================================
+      - name: Post to Misskey
+        env:
+          IMAGE_PATH:    fgi-image/FearGreed_Output.png
+          MISSKEY_HOST:  ${{ secrets.MISSKEY_HOST }}
+          MISSKEY_TOKEN: ${{ secrets.MISSKEY_TOKEN }}
+        run: python post_misskey.py
