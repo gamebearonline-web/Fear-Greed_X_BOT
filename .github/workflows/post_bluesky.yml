@@ -11,30 +11,63 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ------------------------
+      # ① リポジトリ取得
+      # ------------------------
       - uses: actions/checkout@v4
+
+      # ------------------------
+      # ② Python セットアップ
+      # ------------------------
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - run: |
+      # ------------------------
+      # ③ 依存関係インストール
+      # ------------------------
+      - name: Install deps
+        run: |
           pip install -r requirements.txt
           pip install atproto pytz
 
+      # ==================================================
+      # ★★★ 重要：Google service-account 復元（追加）
+      # ==================================================
+      - name: Restore Google service account key
+        run: |
+          echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
+          chmod 600 service-account.json
+
+      # ------------------------
+      # ④ 画像生成（投稿専用）
+      # ------------------------
       - name: Generate image for POST
         env:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
         run: python generate.py --output /tmp/FearGreed_Output.png
 
-      - uses: actions/upload-artifact@v4
+      # ------------------------
+      # ⑤ artifact アップロード
+      # ------------------------
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
         with:
           name: post-image
           path: /tmp/FearGreed_Output.png
 
-      - uses: actions/download-artifact@v4
+      # ------------------------
+      # ⑥ artifact ダウンロード
+      # ------------------------
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
         with:
           name: post-image
           path: post-image
 
+      # ------------------------
+      # ⑦ Bluesky 投稿
+      # ------------------------
       - name: Post to Bluesky
         env:
           BSKY_HANDLE:        ${{ secrets.BSKY_HANDLE }}
