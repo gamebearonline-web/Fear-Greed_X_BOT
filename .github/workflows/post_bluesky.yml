@@ -1,13 +1,17 @@
 name: FGI - Post to Bluesky
 
 on:
-  workflow_dispatch:
+  workflow_run:
+    workflows: ["generate_image_save_only"]
+    types: [completed]
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   post-bluesky:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -17,60 +21,34 @@ jobs:
       - uses: actions/checkout@v4
 
       # ------------------------
-      # ② Python セットアップ
+      # ② artifact ダウンロード（run-id指定）
+      # ------------------------
+      - name: Download generated image
+        uses: actions/download-artifact@v4
+        with:
+          name: fgi-image
+          path: fgi-image
+          run-id: ${{ github.event.workflow_run.id }}
+
+      # ------------------------
+      # ③ Python セットアップ
       # ------------------------
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       # ------------------------
-      # ③ 依存関係インストール
+      # ④ 依存関係（投稿のみ）
       # ------------------------
-      - name: Install deps
-        run: |
-          pip install -r requirements.txt
+      - run: |
           pip install atproto pytz
 
-      # ==================================================
-      # ★★★ 重要：Google service-account 復元（追加）
-      # ==================================================
-      - name: Restore Google service account key
-        run: |
-          echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
-          chmod 600 service-account.json
-
       # ------------------------
-      # ④ 画像生成（投稿専用）
-      # ------------------------
-      - name: Generate image for POST
-        env:
-          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
-        run: python generate.py --output /tmp/FearGreed_Output.png
-
-      # ------------------------
-      # ⑤ artifact アップロード
-      # ------------------------
-      - name: Upload image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: post-image
-          path: /tmp/FearGreed_Output.png
-
-      # ------------------------
-      # ⑥ artifact ダウンロード
-      # ------------------------
-      - name: Download image artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: post-image
-          path: post-image
-
-      # ------------------------
-      # ⑦ Bluesky 投稿
+      # ⑤ Bluesky 投稿（画像のみ使用）
       # ------------------------
       - name: Post to Bluesky
         env:
           BSKY_HANDLE:        ${{ secrets.BSKY_HANDLE }}
           BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
-          IMAGE_PATH:        post-image/FearGreed_Output.png
+          IMAGE_PATH:        fgi-image/FearGreed_Output.png
         run: python post_bluesky.py
