@@ -1,34 +1,28 @@
 name: FGI - Post to X
 
 on:
-  workflow_run:
-    workflows: ["generate_image"]
-    types: [completed]
+  workflow_dispatch:   # ★ これを必ず入れる
 
 permissions:
   contents: read
-  actions: read
 
 jobs:
   post-x:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download generated image
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: fgi-image
           path: fgi-image
-          run-id: ${{ github.event.workflow_run.id }}
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - run: |
+          pip install -r requirements.txt
           pip install tweepy pytz
 
       - name: Post to X
