@@ -1,34 +1,42 @@
 # ==========================================
-# post_x.py（スプラ方式・最終版）
+# post_x.py（スプラ方式・最終確定版）
 # ==========================================
 import os
 import sys
 import tweepy
 
 # ======================================================
-# 認証情報
+# 環境変数
 # ======================================================
-API_KEY = os.getenv("TWITTER_API_KEY")
-API_SECRET = os.getenv("TWITTER_API_SECRET")
-ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
-ACCESS_SECRET = os.getenv("TWITTER_ACCESS_SECRET")
+API_KEY        = os.getenv("TWITTER_API_KEY")
+API_SECRET     = os.getenv("TWITTER_API_SECRET")
+ACCESS_TOKEN   = os.getenv("TWITTER_ACCESS_TOKEN")
+ACCESS_SECRET  = os.getenv("TWITTER_ACCESS_SECRET")
 
-IMAGE_PATH = os.getenv("IMAGE_PATH")
+IMAGE_PATH     = os.getenv("IMAGE_PATH", "fgi-image/FearGreed_Output.png")
+POST_TEXT_PATH = os.getenv("POST_TEXT_PATH", "fgi-image/post_text.txt")
 
+# ======================================================
+# バリデーション
+# ======================================================
 if not all([API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET]):
     print("[ERROR] Twitter API credentials が不足しています")
     sys.exit(1)
 
-if not IMAGE_PATH or not os.path.exists(IMAGE_PATH):
+if not os.path.exists(IMAGE_PATH):
     print("[ERROR] 画像が見つかりません →", IMAGE_PATH)
     sys.exit(1)
 
+if not os.path.exists(POST_TEXT_PATH):
+    print("[ERROR] 投稿文が見つかりません →", POST_TEXT_PATH)
+    sys.exit(1)
+
 # ======================================================
-# 投稿文（固定 or 生成済みを使う）
+# 投稿文読み込み（generate.py 生成物）
 # ======================================================
-def build_post_text():
-    # ※ generate.py 側で内容は確定している前提
-    return "CNN・Crypto Fear & Greed Index\n#FearAndGreed #Bitcoin"
+def load_post_text():
+    with open(POST_TEXT_PATH, "r", encoding="utf-8") as f:
+        return f.read().strip()
 
 # ======================================================
 # X 投稿処理
@@ -62,7 +70,11 @@ def post_tweet_v2(text, media_id):
 def main():
     print("[INFO] post_x.py started")
 
-    text = build_post_text()
+    text = load_post_text()
+
+    print("----- POST TEXT (X) -----")
+    print(text)
+
     media_id = upload_media_v1(IMAGE_PATH)
     post_tweet_v2(text, media_id)
 
