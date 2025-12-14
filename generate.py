@@ -2,7 +2,6 @@ import argparse
 import os
 import math
 import requests
-from io import BytesIO
 from datetime import datetime, timedelta
 from PIL import Image, ImageDraw, ImageFont
 
@@ -42,8 +41,13 @@ def get_sheet(sheet_name):
     return client.open_by_key(SHEET_ID).worksheet(sheet_name)
 
 
+def sheet_has_date(ws, date_str):
+    """A列に date_str (YYYY/MM/DD) が存在するか"""
+    return date_str in {r[0] for r in ws.get_all_values()[1:] if r}
+
+
 # ======================================
-# Crypto：1年前の値（JSTで照合）
+# Crypto：1年前の値（JST）
 # ======================================
 def get_crypto_one_year_ago():
     ws = get_sheet("CryptoGreedFear")
@@ -51,7 +55,7 @@ def get_crypto_one_year_ago():
     target = (JST - timedelta(days=365)).strftime("%Y/%m/%d")
 
     for r in ws.get_all_values()[1:]:
-        if r[0] == target:
+        if r and r[0] == target:
             return int(r[1])
     return None
 
@@ -68,47 +72,48 @@ def get_stock_fgi():
 
     res = requests.get(url, headers=headers)
     data = res.json()
-
     fgi = data.get("fgi", data.get("data"))
 
     return {
-        "now":          int(fgi["now"]["value"]),
-        "1_day_ago":    int(fgi["previousClose"]["value"]),
-        "1_week_ago":   int(fgi["oneWeekAgo"]["value"]),
-        "1_month_ago":  int(fgi["oneMonthAgo"]["value"]),
-        "1_year_ago":   int(fgi["oneYearAgo"]["value"]),
-        "raw": fgi,
+        "now":         int(fgi["now"]["value"]),
+        "1_day_ago":   int(fgi["previousClose"]["value"]),
+        "1_week_ago":  int(fgi["oneWeekAgo"]["value"]),
+        "1_month_ago": int(fgi["oneMonthAgo"]["value"]),
+        "1_year_ago":  int(fgi["oneYearAgo"]["value"]),
     }
 
 
 # ======================================
-# Stock FGI → 履歴追記（★ 土日は絶対に更新しない仕様）
+# Stock FGI → 履歴追記（土日スキップ + 日付重複防止）
 # ======================================
 def append_stock_history(stock):
     ws = get_sheet("StockFear&Greed")
-    exist = {r[0] for r in ws.get_all_values()[1:]}
 
     JST = datetime.utcnow() + timedelta(hours=9)
-    weekday = JST.weekday()   # 月=0 ... 日=6
+    weekday = JST.weekday()  # 月=0 ... 日=6
 
-    # ★★★ 土日はシートに書かない（画像生成はする）
     if weekday >= 5:
-        print("[SKIP] Weekend → StockFear&Greed の追記なし")
+        print("[SKIP] Weekend → StockFear&Greed")
         return
 
-    today = JST
+    today_str = JST.strftime("%Y/%m/%d")
+
+    # ★ 今日が既にあるなら完全スキップ
+    if sheet_has_date(ws, today_str):
+        print(f"[SKIP] StockFear&Greed {today_str} already exists")
+        return
 
     points = [
-        (today,                     stock["now"]),
-        (today - timedelta(days=1), stock["1_day_ago"]),
-        (today - timedelta(days=7), stock["1_week_ago"]),
-        (today - timedelta(days=30), stock["1_month_ago"]),
-        (today - timedelta(days=365), stock["1_year_ago"]),
+        (JST,                       stock["now"]),
+        (JST - timedelta(days=1),   stock["1_day_ago"]),
+        (JST - timedelta(days=7),   stock["1_week_ago"]),
+        (JST - timedelta(days=30),  stock["1_month_ago"]),
+        (JST - timedelta(days=365), stock["1_year_ago"]),
     ]
 
     for dt, v in points:
         d = dt.strftime("%Y/%m/%d")
-        if d not in exist:
+        if not sheet_has_date(ws, d):
             ws.append_row([d, v])
             print(f"[ADD] StockFear&Greed → {d}: {v}")
 
@@ -119,50 +124,51 @@ def append_stock_history(stock):
 def get_crypto_fgi():
     raw = requests.get("https://api.alternative.me/fng/?limit=30").json()["data"]
     return {
-        "now": int(raw[0]["value"]),
-        "1_day_ago": int(raw[1]["value"]),
-        "1_week_ago": int(raw[7]["value"]),
+        "now":         int(raw[0]["value"]),
+        "1_day_ago":   int(raw[1]["value"]),
+        "1_week_ago":  int(raw[7]["value"]),
         "1_month_ago": int(raw[-1]["value"]),
         "raw": raw,
     }
 
 
 # ======================================
-# Crypto 履歴追記（毎日追加 OK）
+# Crypto 履歴追記（日付重複防止）
 # ======================================
 def append_last_7days_crypto(raw):
     ws = get_sheet("CryptoGreedFear")
-    exist = {r[0] for r in ws.get_all_values()[1:]}
 
     for d in reversed(raw[:7]):
         dt = datetime.fromtimestamp(int(d["timestamp"])) + timedelta(hours=9)
-        date = dt.strftime("%Y/%m/%d")
+        date_str = dt.strftime("%Y/%m/%d")
 
-        if date not in exist:
-            ws.append_row([date, int(d["value"]), d["value_classification"]])
-            print(f"[ADD] CryptoGreedFear → {date}: {int(d['value'])}")
+        if sheet_has_date(ws, date_str):
+            print(f"[SKIP] CryptoGreedFear {date_str}")
+            continue
+
+        ws.append_row([date_str, int(d["value"]), d["value_classification"]])
+        print(f"[ADD] CryptoGreedFear → {date_str}: {int(d['value'])}")
 
 
 # ======================================
-# グラフ用データ（過去29 + 今日 = 30点）
+# グラフ用データ（29 + 今日）
 # ======================================
 def get_last30_with_now(sheet, now_value):
     ws = get_sheet(sheet)
-    vals = [int(float(r[1])) for r in ws.get_all_values()[1:][-29:]]
+    vals = [int(float(r[1])) for r in ws.get_all_values()[1:][-29:] if r]
     vals.append(int(now_value))
     return vals
 
 
-# --------------------------------------
-# 色判定
-# --------------------------------------
+# ======================================
+# 色・ラベル
+# ======================================
 def value_to_color(v):
-    if v <= 24:  return "#FD5763"
-    if v <= 44:  return "#FC854E"
-    if v <= 55:  return "#FED236"
-    if v <= 75:  return "#A1D778"
+    if v <= 24: return "#FD5763"
+    if v <= 44: return "#FC854E"
+    if v <= 55: return "#FED236"
+    if v <= 75: return "#A1D778"
     return "#6BCA67"
-
 
 def value_to_label(v):
     if v <= 24: return "Extreme Fear"
@@ -172,147 +178,111 @@ def value_to_label(v):
     return "Extreme Greed"
 
 
-# --------------------------------------
+# ======================================
 # 描画ユーティリティ
-# --------------------------------------
+# ======================================
 def draw_text_center(draw, box, text, font, color):
-    x, y, w, h = box
-    tw, th = draw.textbbox((0, 0), text, font=font)[2:]
-    draw.text((x + (w - tw)/2, y + (h - th)/2), text, font=font, fill=color)
-
+    x,y,w,h = box
+    tw,th = draw.textbbox((0,0), text, font=font)[2:]
+    draw.text((x+(w-tw)/2, y+(h-th)/2), text, font=font, fill=color)
 
 def draw_label(draw, box, value, font):
     label = value_to_label(value)
     x,y,w,h = box
-    tw, th = draw.textbbox((0,0), label, font=font)[2:]
+    tw,th = draw.textbbox((0,0), label, font=font)[2:]
     draw.text((x+(w-tw)/2, y+h), label, font=font, fill=value_to_color(value))
 
 
-# --------------------------------------
-# 針
-# --------------------------------------
 def draw_needle(draw, center, value, length=200):
-    v = value
-    if v <= 24: angle = 180 + (v/24)*35
-    elif v <= 44: angle = 216 + ((v-25)/19)*35
-    elif v <= 55: angle = 252 + ((v-45)/10)*35
-    elif v <= 75: angle = 288 + ((v-56)/19)*35
-    else: angle = 324 + ((v-76)/24)*36
+    if value <= 24: angle = 180 + (value/24)*35
+    elif value <= 44: angle = 216 + ((value-25)/19)*35
+    elif value <= 55: angle = 252 + ((value-45)/10)*35
+    elif value <= 75: angle = 288 + ((value-56)/19)*35
+    else: angle = 324 + ((value-76)/24)*36
 
     rad = math.radians(angle)
     x0,y0 = center
     x1 = x0 + length * math.cos(rad)
     y1 = y0 + length * math.sin(rad)
-
     draw.line((x0,y0,x1,y1), fill="#444444", width=6)
 
 
-# --------------------------------------
-# 折れ線グラフ
-# --------------------------------------
 def draw_line(draw, box, values, color, dot):
     x,y,w,h = box
-    pts = []
-    for i,v in enumerate(values):
-        px = x + (i/(len(values)-1))*w
-        py = y + h - (v/100)*h
-        pts.append((px,py))
-
+    pts = [(x+(i/(len(values)-1))*w, y+h-(v/100)*h) for i,v in enumerate(values)]
     draw.line(pts, fill=color, width=3)
-
     for px,py in pts:
         draw.ellipse((px-3,py-3,px+3,py+3), fill=dot)
 
 
-# --------------------------------------
-# 日付（JST）
-# --------------------------------------
 def draw_date(draw):
     JST = datetime.utcnow() + timedelta(hours=9)
     week = "月火水木金土日"[JST.weekday()]
     text = JST.strftime("%Y/%m/%d") + f"（{week}）"
-
     font = ImageFont.truetype("noto-sans-jp/NotoSansJP-Regular.otf", 20)
-
-    x,y,w,h = 1020, 15, 140, 20
-    tw, th = draw.textbbox((0,0), text, font=font)[2:]
+    x,y,w,h = 1020,15,140,20
+    tw,th = draw.textbbox((0,0), text, font=font)[2:]
     draw.text((x+(w-tw)/2, y+(h-th)/2), text, font=font, fill="#4D4D4D")
 
 
 # ======================================
-# ★ 画像生成（完全版）
+# 画像生成
 # ======================================
 def generate(output_path):
-
-    # ---- データ取得 ----
     stock = get_stock_fgi()
     crypto = get_crypto_fgi()
     crypto_1y = get_crypto_one_year_ago()
 
-    # ---- スプレッドシート更新 ----
     append_stock_history(stock)
     append_last_7days_crypto(crypto["raw"])
 
-    # ---- テンプレ読み込み ----
     base = Image.open("template/FearGreedTemplate.png").convert("RGBA")
     draw = ImageDraw.Draw(base)
 
-    # ---- フォント ----
     font = ImageFont.truetype("noto-sans-jp/NotoSansJP-Bold.otf", 40)
     font_big = ImageFont.truetype("noto-sans-jp/NotoSansJP-Bold.otf", 70)
     font_small = ImageFont.truetype("noto-sans-jp/NotoSansJP-Regular.otf", 16)
 
     coords = {
         "stock": {
-            "1_day_ago":   [220,350,40,40],
-            "1_week_ago":  [220,423,40,40],
-            "1_month_ago": [220,496,40,40],
-            "1_year_ago":  [220,570,40,40],
-            "previous":    [211,160,218,218],
+            "1_day_ago":[220,350,40,40],
+            "1_week_ago":[220,423,40,40],
+            "1_month_ago":[220,496,40,40],
+            "1_year_ago":[220,570,40,40],
+            "previous":[211,160,218,218],
         },
         "crypto": {
-            "1_day_ago":   [1060,350,40,40],
-            "1_week_ago":  [1060,423,40,40],
-            "1_month_ago": [1060,496,40,40],
-            "1_year_ago":  [1060,570,40,40],
-            "previous":    [771,160,218,218],
+            "1_day_ago":[1060,350,40,40],
+            "1_week_ago":[1060,423,40,40],
+            "1_month_ago":[1060,496,40,40],
+            "1_year_ago":[1060,570,40,40],
+            "previous":[771,160,218,218],
         },
         "graph":[360,380,480,220]
     }
 
-    # ---- Stock ----
     for k in ["1_day_ago","1_week_ago","1_month_ago","1_year_ago"]:
         v = stock[k]
         draw_text_center(draw, coords["stock"][k], str(v), font, value_to_color(v))
         draw_label(draw, coords["stock"][k], v, font_small)
 
-    # ---- Crypto ----
     for k in ["1_day_ago","1_week_ago","1_month_ago","1_year_ago"]:
         v = crypto_1y if k=="1_year_ago" else crypto[k]
         draw_text_center(draw, coords["crypto"][k], str(v), font, value_to_color(v))
         draw_label(draw, coords["crypto"][k], v, font_small)
 
-    # ---- 針 ----
-    draw_needle(draw, (320, 324), stock["now"])
-    draw_needle(draw, (880, 324), crypto["now"])
+    draw_needle(draw, (320,324), stock["now"])
+    draw_needle(draw, (880,324), crypto["now"])
 
-    # ---- 中央値 ----
     draw_text_center(draw, coords["stock"]["previous"], str(stock["now"]), font_big, value_to_color(stock["now"]))
     draw_text_center(draw, coords["crypto"]["previous"], str(crypto["now"]), font_big, value_to_color(crypto["now"]))
 
-    # ---- グラフ ----
     x,y,w,h = coords["graph"]
-    draw_line(draw, (x,y,w,h),
-              get_last30_with_now("StockFear&Greed", stock["now"]),
-              "#f2f2f2", "#ffffff")
-    draw_line(draw, (x,y,w,h),
-              get_last30_with_now("CryptoGreedFear", crypto["now"]),
-              "#f7921a", "#f7921a")
+    draw_line(draw, (x,y,w,h), get_last30_with_now("StockFear&Greed", stock["now"]), "#f2f2f2", "#ffffff")
+    draw_line(draw, (x,y,w,h), get_last30_with_now("CryptoGreedFear", crypto["now"]), "#f7921a", "#f7921a")
 
-    # ---- 日付 ----
     draw_date(draw)
 
-    # ---- 保存 ----
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     base.save(output_path)
     print("[SAVED]", output_path)
