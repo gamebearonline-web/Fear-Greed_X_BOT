@@ -1,5 +1,5 @@
 # ==========================================
-# post_bluesky.py（スプラ方式・最終版）
+# post_bluesky.py（スプラ方式・最終確定版）
 # ==========================================
 import os
 from atproto import Client
@@ -19,21 +19,19 @@ if not IMAGE_PATH or not os.path.exists(IMAGE_PATH):
     raise Exception(f"[ERROR] 画像が存在しません → {IMAGE_PATH}")
 
 # -------------------------------
-# 投稿文（確定済み文字列）
+# 投稿文（固定）
 # -------------------------------
-def build_post_text():
-    return "CNN・Crypto Fear & Greed Index\n#FearAndGreed #Bitcoin"
+POST_TEXT = "CNN・Crypto Fear & Greed Index\n#FearAndGreed #Bitcoin"
 
 # -------------------------------
 # Bluesky 投稿
 # -------------------------------
 def main():
     print("[INFO] Starting Bluesky posting...")
-
-    text = build_post_text()
-    print("\n----- POST TEXT (Bluesky) -----\n" + text + "\n")
+    print("\n----- POST TEXT (Bluesky) -----\n" + POST_TEXT + "\n")
 
     client = Client()
+
     try:
         client.login(BSKY_HANDLE, BSKY_APP_PASSWORD)
         print("[INFO] Bluesky Login OK")
@@ -43,10 +41,18 @@ def main():
     with open(IMAGE_PATH, "rb") as f:
         img_bytes = f.read()
 
-    blob = client.upload_blob(img_bytes, encoding="image/png")
-    embed = client.get_embed_image(blob, "Fear & Greed Index")
+    # ★★★ encoding を渡さない（最重要）
+    blob = client.upload_blob(img_bytes)
 
-    client.create_post(text=text, embed=embed)
+    embed = client.get_embed_image(
+        blob,
+        alt="Fear & Greed Index"
+    )
+
+    client.create_post(
+        text=POST_TEXT,
+        embed=embed
+    )
 
     print("[SUCCESS] 投稿完了（Bluesky）")
 
