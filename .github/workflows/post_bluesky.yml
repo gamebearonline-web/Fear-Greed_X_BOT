@@ -1,62 +1,43 @@
 name: FGI - Post to Bluesky
 
 on:
-  workflow_run:
-    workflows:
-      - FGI_generate_image_save   # ★ 生成workflowの name と完全一致
-    types:
-      - completed
+  workflow_dispatch:
 
 permissions:
   contents: read
-  actions: read
 
 jobs:
   post-bluesky:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
-      # --------------------------
-      # ① リポジトリ取得
-      # --------------------------
       - uses: actions/checkout@v4
-
-      # --------------------------
-      # ② Python セットアップ
-      # --------------------------
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install deps
-        run: |
+      - run: |
           pip install -r requirements.txt
           pip install atproto pytz
 
-      # --------------------------
-      # ③ artifact を取得（run-id 指定）
-      # --------------------------
-      - name: Download FGI image artifact
-        uses: actions/download-artifact@v4
+      - name: Generate image for POST
+        env:
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+        run: python generate.py --output /tmp/FearGreed_Output.png
+
+      - uses: actions/upload-artifact@v4
         with:
-          name: FGI_Image                         # ★ 完全一致
-          path: fgi-image
-          run-id: ${{ github.event.workflow_run.id }}
-          repository: ${{ github.repository }}
+          name: post-image
+          path: /tmp/FearGreed_Output.png
 
-      - name: Show downloaded files
-        run: |
-          echo "=== Show artifact directory ==="
-          ls -la fgi-image/
+      - uses: actions/download-artifact@v4
+        with:
+          name: post-image
+          path: post-image
 
-      # --------------------------
-      # ④ Bluesky 投稿
-      # --------------------------
       - name: Post to Bluesky
         env:
           BSKY_HANDLE:        ${{ secrets.BSKY_HANDLE }}
           BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
-          RAPIDAPI_KEY:      ${{ secrets.RAPIDAPI_KEY }}
-          IMAGE_PATH:        fgi-image/FearGreed_Output.png
+          IMAGE_PATH:        post-image/FearGreed_Output.png
         run: python post_bluesky.py
