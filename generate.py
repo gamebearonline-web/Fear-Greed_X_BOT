@@ -243,12 +243,23 @@ def draw_line(draw, box, values, color, dot):
 
 def draw_date(draw):
     JST = datetime.utcnow() + timedelta(hours=9)
-    week = "月火水木金土日"[JST.weekday()]
-    text = JST.strftime("%Y/%m/%d") + f"（{week}）"
+
+    # 英語の曜日表記
+    weekday_en = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][JST.weekday()]
+
+    text = JST.strftime("%Y/%m/%d") + f" ({weekday_en})"
+
     font = ImageFont.truetype("noto-sans-jp/NotoSansJP-Regular.otf", 20)
-    x,y,w,h = 1020,15,140,20
-    tw,th = draw.textbbox((0,0), text, font=font)[2:]
-    draw.text((x+(w-tw)/2, y+(h-th)/2), text, font=font, fill="#4D4D4D")
+    x, y, w, h = 1020, 15, 140, 20
+
+    tw, th = draw.textbbox((0, 0), text, font=font)[2:]
+    draw.text(
+        (x + (w - tw) / 2, y + (h - th) / 2),
+        text,
+        font=font,
+        fill="#4D4D4D"
+    )
+
 
 
 # ======================================
