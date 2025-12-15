@@ -78,9 +78,9 @@ def build_post_text(stock, crypto):
     return (
         "CNN・Crypto Fear & Greed Index（恐怖と欲望指数）\n"
         f"{date_text}\n\n"
-        f"⬜Stock：{stock['now']}{diff(stock['now'], stock['1_day_ago'])}"
+        f"⬜CNN：{stock['now']}{diff(stock['now'], stock['1_day_ago'])}"
         f"【{value_to_label(stock['now'])}】\n"
-        f"🟧Bitcoin：{crypto['now']}{diff(crypto['now'], crypto['1_day_ago'])}"
+        f"🟧Crypto：{crypto['now']}{diff(crypto['now'], crypto['1_day_ago'])}"
         f"【{value_to_label(crypto['now'])}】"
     )
 
