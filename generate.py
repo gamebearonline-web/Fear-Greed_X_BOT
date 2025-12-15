@@ -250,7 +250,7 @@ def draw_date(draw):
     text = JST.strftime("%Y/%m/%d") + f" ({weekday_en})"
 
     font = ImageFont.truetype("noto-sans-jp/NotoSansJP-Regular.otf", 20)
-    x, y, w, h = 1020, 15, 140, 20
+    x, y, w, h = 990, 15, 140, 20
 
     tw, th = draw.textbbox((0, 0), text, font=font)[2:]
     draw.text(
