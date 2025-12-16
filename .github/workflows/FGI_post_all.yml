@@ -27,12 +27,14 @@ jobs:
           python-version: "3.11"
 
       # ====================================
-      # ③ 依存関係インストール
+      # ③ 依存関係インストール（★修正）
       # ====================================
       - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
+          pip install tweepy atproto pytz
+
 
       # ====================================
       # ④ Google service-account 復元
