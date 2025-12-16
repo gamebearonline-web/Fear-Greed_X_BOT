@@ -4,28 +4,50 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # push 用
+  contents: write   # push に必須
 
 jobs:
   generate-image:
     runs-on: ubuntu-latest
 
     steps:
+      # ====================================
+      # ① Checkout（push するので fetch-depth:0）
+      # ====================================
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # ====================================
+      # ② Python セットアップ
+      # ====================================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      # ====================================
+      # ③ 依存関係
+      # ====================================
       - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
 
+      # ====================================
+      # ④ SERVICE_ACCOUNT_JSON 復元（generate.py 用）
+      # ====================================
+      - name: Restore service account json
+        run: |
+          cat << 'EOF' > service-account.json
+          ${{ secrets.SERVICE_ACCOUNT_JSON }}
+          EOF
+          chmod 600 service-account.json
+
+      # ====================================
+      # ⑤ 画像生成（generate.py は変更しない）
+      # ====================================
       - name: Generate image
         env:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
@@ -34,6 +56,9 @@ jobs:
           python generate.py --output output/FearGreed_Output.png
           ls -la output
 
+      # ====================================
+      # ⑥ GitHub に保存（commit & push）
+      # ====================================
       - name: Commit and push image
         run: |
           git config user.name "github-actions[bot]"
