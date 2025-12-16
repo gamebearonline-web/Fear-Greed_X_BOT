@@ -31,8 +31,8 @@ jobs:
       # ====================================
       - name: Install dependencies
         run: |
+          pip install --upgrade pip
           pip install -r requirements.txt
-          pip install tweepy atproto pytz requests
 
       # ====================================
       # ④ Google service-account 復元
@@ -54,33 +54,20 @@ jobs:
           ls -la output
 
       # ====================================
-      # ⑥ artifact アップロード（画像＋投稿文）
+      # ⑥ 生成物チェック（最重要）
       # ====================================
-      - name: Upload FGI artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: fgi-image
-          path: |
-            output/FearGreed_Output.png
-            output/post_text.txt
-          retention-days: 1
+      - name: Check generated files
+        run: |
+          test -f output/FearGreed_Output.png
+          test -f output/post_text.txt
 
       # ====================================
-      # ⑦ artifact ダウンロード（投稿用）
-      # ====================================
-      - name: Download FGI artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: fgi-image
-          path: fgi-image
-
-      # ====================================
-      # ⑧ X 投稿（生成処理なし）
+      # ⑦ X 投稿
       # ====================================
       - name: Post to X
         env:
-          IMAGE_PATH:      fgi-image/FearGreed_Output.png
-          POST_TEXT_PATH: fgi-image/post_text.txt
+          IMAGE_PATH:      output/FearGreed_Output.png
+          POST_TEXT_PATH: output/post_text.txt
           TWITTER_API_KEY:        ${{ secrets.TWITTER_API_KEY }}
           TWITTER_API_SECRET:     ${{ secrets.TWITTER_API_SECRET }}
           TWITTER_ACCESS_TOKEN:   ${{ secrets.TWITTER_ACCESS_TOKEN }}
@@ -88,23 +75,23 @@ jobs:
         run: python post_x.py
 
       # ====================================
-      # ⑨ Bluesky 投稿（生成処理なし）
+      # ⑧ Bluesky 投稿
       # ====================================
       - name: Post to Bluesky
         env:
-          IMAGE_PATH:      fgi-image/FearGreed_Output.png
-          POST_TEXT_PATH: fgi-image/post_text.txt
-          BSKY_HANDLE:       ${{ secrets.BSKY_HANDLE }}
+          IMAGE_PATH:      output/FearGreed_Output.png
+          POST_TEXT_PATH: output/post_text.txt
+          BSKY_HANDLE:        ${{ secrets.BSKY_HANDLE }}
           BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
         run: python post_bluesky.py
 
       # ====================================
-      # ⑩ Misskey 投稿（生成処理なし）
+      # ⑨ Misskey 投稿
       # ====================================
       - name: Post to Misskey
         env:
-          IMAGE_PATH:      fgi-image/FearGreed_Output.png
-          POST_TEXT_PATH: fgi-image/post_text.txt
+          IMAGE_PATH:      output/FearGreed_Output.png
+          POST_TEXT_PATH: output/post_text.txt
           MISSKEY_HOST:  ${{ secrets.MISSKEY_HOST }}
           MISSKEY_TOKEN: ${{ secrets.MISSKEY_TOKEN }}
         run: python post_misskey.py
