@@ -1,66 +1,57 @@
-name: generate_image
+name: Generate & Save FearGreed Image
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "5 0 * * *"   # JST 9:05
 
 permissions:
-  contents: read
-  actions: read
+  contents: write   # ← 重要（pushに必須）
 
 jobs:
   generate-image:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
 
     steps:
-      # ==========================
-      # ① リポジトリ取得
-      # ==========================
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # ← push するため必須
 
-      # ==========================
-      # ② Python セットアップ
-      # ==========================
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ==========================
-      # ③ 依存関係インストール
-      # ==========================
       - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      # ==========================
-      # ④ Google service-account 復元
-      # ==========================
-      - name: Restore service account
+      - name: Create service account file
         run: |
-          echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
+          echo "${{ secrets.GCP_SERVICE_ACCOUNT_BASE64 }}" | base64 --decode > service-account.json
           chmod 600 service-account.json
 
-      # ==========================
-      # ⑤ 画像生成（保存専用）
-      # ==========================
-      - name: Generate Fear & Greed image (no post)
+      - name: Generate image
         env:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
         run: |
           mkdir -p output
           python generate.py --output output/FearGreed_Output.png
-          echo "---- generated files ----"
           ls -la output
 
-      # ==========================
-      # ⑥ artifact 保存（確認用）
-      # ==========================
-      - name: Upload image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: fgi-generate-image
-          path: output/FearGreed_Output.png
-          retention-days: 7
+      - name: Commit and push image
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add output/FearGreed_Output.png
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git commit -m "Update Fear & Greed image ($(date -u '+%Y-%m-%d'))"
+          git push
