@@ -5,34 +5,62 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
-  generate:
+  generate-image:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
+      # ==========================
+      # ① リポジトリ取得
+      # ==========================
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      # ==========================
+      # ② Python セットアップ
+      # ==========================
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - run: pip install -r requirements.txt
+      # ==========================
+      # ③ 依存関係インストール
+      # ==========================
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
 
+      # ==========================
+      # ④ Google service-account 復元
+      # ==========================
       - name: Restore service account
         run: |
           echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
           chmod 600 service-account.json
 
-      - name: Generate image
+      # ==========================
+      # ⑤ 画像生成（保存専用）
+      # ==========================
+      - name: Generate Fear & Greed image (no post)
         env:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
         run: |
           mkdir -p output
           python generate.py --output output/FearGreed_Output.png
+          echo "---- generated files ----"
+          ls -la output
 
-      - name: Upload artifact
+      # ==========================
+      # ⑥ artifact 保存（確認用）
+      # ==========================
+      - name: Upload image artifact
         uses: actions/upload-artifact@v4
         with:
-          name: fgi-image
+          name: fgi-generate-image
           path: output/FearGreed_Output.png
+          retention-days: 7
