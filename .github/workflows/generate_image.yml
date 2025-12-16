@@ -40,10 +40,9 @@ jobs:
       # ====================================
       - name: Restore service account json
         run: |
-          cat << 'EOF' > service-account.json
-          ${{ secrets.SERVICE_ACCOUNT_JSON }}
-          EOF
+          echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" | base64 --decode > service-account.json
           chmod 600 service-account.json
+
 
       # ====================================
       # ⑤ 画像生成（generate.py は変更しない）
