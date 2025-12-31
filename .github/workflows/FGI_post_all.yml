@@ -64,17 +64,18 @@ jobs:
           test -f output/post_text.txt
 
       # ====================================
-      # ⑦ X 投稿
+      # ⑦ X 投稿（停止中）
       # ====================================
-      - name: Post to X
-        env:
-          IMAGE_PATH:      output/FearGreed_Output.png
-          POST_TEXT_PATH: output/post_text.txt
-          TWITTER_API_KEY:        ${{ secrets.TWITTER_API_KEY }}
-          TWITTER_API_SECRET:     ${{ secrets.TWITTER_API_SECRET }}
-          TWITTER_ACCESS_TOKEN:   ${{ secrets.TWITTER_ACCESS_TOKEN }}
-          TWITTER_ACCESS_SECRET:  ${{ secrets.TWITTER_ACCESS_SECRET }}
-        run: python post_x.py
+      # - name: Post to X
+      #   env:
+      #     IMAGE_PATH:      output/FearGreed_Output.png
+      #     POST_TEXT_PATH: output/post_text.txt
+      #     TWITTER_API_KEY:        ${{ secrets.TWITTER_API_KEY }}
+      #     TWITTER_API_SECRET:     ${{ secrets.TWITTER_API_SECRET }}
+      #     TWITTER_ACCESS_TOKEN:   ${{ secrets.TWITTER_ACCESS_TOKEN }}
+      #     TWITTER_ACCESS_SECRET:  ${{ secrets.TWITTER_ACCESS_SECRET }}
+      #   run: python post_x.py
+
 
       # ====================================
       # ⑧ Bluesky 投稿
