@@ -87,22 +87,20 @@ def build_post_text(stock, crypto):
 
 
 # ======================================
-# RapidAPI → Stock FGI
+# CNN公式エンドポイント → Stock FGI
 # ======================================
 def get_stock_fgi():
-    url = "https://fear-and-greed-index.p.rapidapi.com/v1/fgi"
+    url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
     headers = {
-        "x-rapidapi-key": os.getenv("RAPIDAPI_KEY"),
-        "x-rapidapi-host": "fear-and-greed-index.p.rapidapi.com",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+        "Accept": "application/json",
     }
 
     try:
         res = requests.get(url, headers=headers, timeout=30)
 
         print("=" * 60)
-        print("RapidAPI Status Code :", res.status_code)
-        print("RapidAPI Response    :")
-        print(res.text)
+        print("CNN FGI Status Code :", res.status_code)
         print("=" * 60)
 
         # HTTPエラーなら例外発生
@@ -110,8 +108,7 @@ def get_stock_fgi():
 
         data = res.json()
 
-        # APIのレスポンス形式確認
-        fgi = data.get("fgi") or data.get("data")
+        fgi = data.get("fear_and_greed")
 
         if fgi is None:
             raise RuntimeError(
@@ -120,11 +117,11 @@ def get_stock_fgi():
             )
 
         return {
-            "now":         int(fgi["now"]["value"]),
-            "1_day_ago":   int(fgi["previousClose"]["value"]),
-            "1_week_ago":  int(fgi["oneWeekAgo"]["value"]),
-            "1_month_ago": int(fgi["oneMonthAgo"]["value"]),
-            "1_year_ago":  int(fgi["oneYearAgo"]["value"]),
+            "now":         round(float(fgi["score"])),
+            "1_day_ago":   round(float(fgi["previous_close"])),
+            "1_week_ago":  round(float(fgi["previous_1_week"])),
+            "1_month_ago": round(float(fgi["previous_1_month"])),
+            "1_year_ago":  round(float(fgi["previous_1_year"])),
         }
 
     except requests.exceptions.RequestException as e:
@@ -372,5 +369,3 @@ def generate(output_path):
 if __name__ == "__main__":
     args = parse_args()
     generate(args.output)
-
-
