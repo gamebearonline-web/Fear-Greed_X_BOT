@@ -96,18 +96,46 @@ def get_stock_fgi():
         "x-rapidapi-host": "fear-and-greed-index.p.rapidapi.com",
     }
 
-    res = requests.get(url, headers=headers)
-    data = res.json()
-    fgi = data.get("fgi", data.get("data"))
+    try:
+        res = requests.get(url, headers=headers, timeout=30)
 
-    return {
-        "now":         int(fgi["now"]["value"]),
-        "1_day_ago":   int(fgi["previousClose"]["value"]),
-        "1_week_ago":  int(fgi["oneWeekAgo"]["value"]),
-        "1_month_ago": int(fgi["oneMonthAgo"]["value"]),
-        "1_year_ago":  int(fgi["oneYearAgo"]["value"]),
-    }
+        print("=" * 60)
+        print("RapidAPI Status Code :", res.status_code)
+        print("RapidAPI Response    :")
+        print(res.text)
+        print("=" * 60)
 
+        # HTTPエラーなら例外発生
+        res.raise_for_status()
+
+        data = res.json()
+
+        # APIのレスポンス形式確認
+        fgi = data.get("fgi") or data.get("data")
+
+        if fgi is None:
+            raise RuntimeError(
+                f"FGIデータが取得できませんでした。\n"
+                f"Response JSON:\n{data}"
+            )
+
+        return {
+            "now":         int(fgi["now"]["value"]),
+            "1_day_ago":   int(fgi["previousClose"]["value"]),
+            "1_week_ago":  int(fgi["oneWeekAgo"]["value"]),
+            "1_month_ago": int(fgi["oneMonthAgo"]["value"]),
+            "1_year_ago":  int(fgi["oneYearAgo"]["value"]),
+        }
+
+    except requests.exceptions.RequestException as e:
+        print("=== HTTP通信エラー ===")
+        print(e)
+        raise
+
+    except Exception as e:
+        print("=== FGI解析エラー ===")
+        print(e)
+        raise
 
 # ======================================
 # Stock FGI → 履歴追記（土日スキップ + 日付重複防止）
